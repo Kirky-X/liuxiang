@@ -1,0 +1,20 @@
+# Yamllint CI 配置（liuxiang 自身）
+# 专为含 GitHub Actions ${{ }} 表达式的场景设计
+# 禁用 braces/brackets：避免误判 Actions 表达式 ${{ ... }}
+extends: default
+rules:
+  line-length: disable
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  truthy:
+    check-keys: false
+  comments:
+    require-starting-space: false
+  comments-indentation: disable
+  empty-lines:
+    max: 2
+  new-line-at-end-of-file: disable
+  braces: disable
+  brackets: disable

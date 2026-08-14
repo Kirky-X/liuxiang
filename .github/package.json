@@ -1,0 +1,9 @@
+{
+  "name": "liuxiang-ci",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CI 工具依赖（liuxiang 自身 GitHub Actions 用）",
+  "dependencies": {
+    "prettier": "3.3.3"
+  }
+}

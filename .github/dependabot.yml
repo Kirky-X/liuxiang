@@ -1,0 +1,22 @@
+# Dependabot 依赖更新（GitHub 原生）
+# liuxiang 是 Python 脚本 + YAML 模板仓库，监控 GitHub Actions 版本
+version: 2
+
+updates:
+  # GitHub Actions 版本监控（weekly，按 minor/patch 分组，major 单独审）
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, github-actions]
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      minor-actions-dependencies:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope
