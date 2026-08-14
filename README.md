@@ -1,4 +1,4 @@
-# Liuxiang (流向) —— 学术研究全流程套件
+# Liuxiang (刘向) —— 学术研究全流程套件
 
 [English](README_EN.md)
 

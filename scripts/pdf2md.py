@@ -48,7 +48,7 @@ def convert_with_pandoc(pdf_path: Path, images_dir: Path | None = None) -> str |
         images_dir.mkdir(parents=True, exist_ok=True)
         cmd.append(f"--extract-media={images_dir.resolve()}")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -78,6 +78,7 @@ def convert_with_pdftotext(pdf_path: Path) -> str | None:
             capture_output=True,
             text=True,
             timeout=120,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout
@@ -137,6 +138,7 @@ def convert_raw_text(pdf_path: Path) -> str:
             capture_output=True,
             text=True,
             timeout=120,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout
@@ -254,25 +256,17 @@ def add_structure_heuristics(text: str) -> str:
     for line in lines:
         stripped = line.strip()
         if stripped and (
-            stripped.startswith("1 ")
-            or stripped.startswith("1. ")
-            or stripped.startswith("1.1 ")
-            or stripped.startswith("Abstract")
-            or stripped.startswith("Introduction")
-            or stripped.startswith("Conclusion")
-            or stripped.startswith("References")
-            or stripped.startswith("Acknowledgment")
-        ):
-            if len(stripped) < 80:
-                if stripped.startswith("References"):
-                    output.append(f"\n## {stripped}\n")
-                elif stripped[0].isdigit() and "." in stripped[:5]:
-                    depth = stripped.count(".") + 2
-                    depth = min(depth, 4)
-                    output.append(f"\n{'#' * depth} {stripped}\n")
-                else:
-                    output.append(f"\n## {stripped}\n")
-                continue
+            stripped.startswith(("1 ", "1. ", "1.1 ", "Abstract", "Introduction", "Conclusion", "References", "Acknowledgment"))
+        ) and len(stripped) < 80:
+            if stripped.startswith("References"):
+                output.append(f"\n## {stripped}\n")
+            elif stripped[0].isdigit() and "." in stripped[:5]:
+                depth = stripped.count(".") + 2
+                depth = min(depth, 4)
+                output.append(f"\n{'#' * depth} {stripped}\n")
+            else:
+                output.append(f"\n## {stripped}\n")
+            continue
         output.append(line)
     return "\n".join(output)
 
@@ -315,8 +309,8 @@ def convert(source: str, paper_id: str, output_path: str | None = None) -> str:
         body = convert_with_pandoc(pdf_path, images_dir)
         if body is None:
             # pymupdf：文本 + 图片提取
+
             from pymupdf import open as fitz_open
-            import logging
             body_parts = []
             with fitz_open(str(pdf_path)) as doc:
                 for page_idx, page in enumerate(doc, 1):

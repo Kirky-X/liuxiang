@@ -1,0 +1,9 @@
+[lint]
+# 脚本类项目，部分规则按设计意图忽略
+ignore = [
+    "BLE001",   # 脚本顶层 except Exception 是故意的（多源降级/容错）
+    "S110",     # except-pass 用于可选依赖降级
+    "S112",     # except-continue 用于多源循环跳过失败
+    "SIM115",   # NamedTemporaryFile 上下文管理器改动影响逻辑
+    "RUF012",   # 类属性 dict 是常量映射表
+]

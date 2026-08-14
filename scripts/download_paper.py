@@ -30,9 +30,8 @@ download_paper.py — 论文下载并转换为 Markdown（接口二）
 """
 
 import argparse
-import io
 import hashlib
-import logging
+import io
 import os
 import re
 import shutil
@@ -67,7 +66,7 @@ ARXIV_LATEX_SOURCE_CT = ("application/gzip", "application/x-tar", "application/x
                           "application/x-gzip", "application/octet-stream")
 
 
-def _get_with_retry(url: str, params: dict = None, timeout: int = 15):
+def _get_with_retry(url: str, params: dict | None = None, timeout: int = 15):
     last_exc = None
     for attempt in range(MAX_RETRIES + 1):
         try:
@@ -162,7 +161,7 @@ def resolve_metadata(identifier: str):
     identifier = identifier.strip()
 
     # 情况一：直接给的 URL——无法推断 arXiv 版本，只能走 PDF。
-    if identifier.startswith("http://") or identifier.startswith("https://"):
+    if identifier.startswith(("http://", "https://")):
         meta = {"title": None, "authors": [], "published": None, "abstract": None, "venue": None}
         return meta, identifier, None
 
@@ -344,8 +343,8 @@ def _normalize_pandoc_math(md: str) -> str:
     - 块级公式 `` ```math \\n \\begin{equation}...\\end{equation} \\n ``` ``  →  $$...$$
     另外清理公式编号标签 \\label{} 和交叉引用，避免渲染出乱码。
     """
-    # 行内公式: $`...`$ -> $...$（`\\.` 允许反引号被转义）
-    md = re.sub(r"\$`((?:[^`]|\\.)*)`\$", lambda m: "$" + m.group(1) + "$", md)
+    # 行内公式: $`...`$ -> $...$（`[^`\\]` 与 `\\.` 互斥，避免 ReDoS）
+    md = re.sub(r"\$`((?:[^`\\]|\\.)*)`\$", lambda m: "$" + m.group(1) + "$", md)
 
     # 块级公式: pandoc 输出成 ```math (或 ```latex / 空) 围栏，内含 \begin{equation}/eqnarray/align...
     def block_repl(m):
@@ -667,9 +666,9 @@ def build_markdown(meta: dict, body: str, source_ref: str, conversion: str = "pd
     lines.append(f"- **来源标识**: {source_ref}")
     # 明确标注转换方式，让用户知道公式是否完整保留
     if conversion == "latex":
-        lines.append(f"- **转换方式**: LaTeX 源码 → Markdown（公式、结构完整保留）")
+        lines.append("- **转换方式**: LaTeX 源码 → Markdown（公式、结构完整保留）")
     else:
-        lines.append(f"- **转换方式**: PDF 文本提取（公式可能退化，如有数学符号异常请见谅）")
+        lines.append("- **转换方式**: PDF 文本提取（公式可能退化，如有数学符号异常请见谅）")
     lines.append("")
     if abstract:
         lines.append("## 摘要")

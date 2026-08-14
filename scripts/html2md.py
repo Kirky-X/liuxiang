@@ -463,7 +463,7 @@ def load_meta_from_abs(abs_html: str) -> dict:
 
 def _strip_http_headers(content: str) -> str:
     """Strip HTTP response headers if present (from recorded responses)."""
-    if content.startswith("h2 ") or content.startswith("HTTP/"):
+    if content.startswith(("h2 ", "HTTP/")):
         parts = content.split("\n\n", 1)
         if len(parts) == 2:
             return parts[1]
