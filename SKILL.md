@@ -11,7 +11,7 @@ argument-hint: "[search|paper|reviewer|pipeline] ..."
 
 | 模块 | 功能 | 实现 | 流程文档 |
 | ---- | ---- | ---- | -------- |
-| **search**（默认） | 论文搜索与下载转 Markdown | 脚本驱动（Semantic Scholar / OpenAlex / arXiv 多源） | 本文件下方 |
+| **search**（默认） | 论文搜索与下载转 Markdown | 脚本驱动（Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE 多源） | 本文件下方 |
 | **paper** | 12-agent 论文写作（full/plan/outline/revision/abstract/lit-review/format-convert/citation-check/disclosure） | 多 agent | [`reference/paper.md`](reference/paper.md) |
 | **reviewer** | 7-agent 多视角同行评审（full/re-review/quick/methodology-focus/guided/calibration） | 多 agent | [`reference/reviewer.md`](reference/reviewer.md) |
 | **pipeline** | 端到端 10 阶段流水线编排（研究→写作→诚信审查→评审→修订→定稿） | orchestrator 调度 paper/reviewer | [`reference/pipeline.md`](reference/pipeline.md) |
@@ -45,7 +45,7 @@ search (检索下载原始论文) → paper (写作) → integrity 审查 → re
 1. `scripts/search_papers.py` — 按主题或标题搜索论文，返回标题、作者、发表时间、摘要等列表
 2. `scripts/download_paper.py` — 下载一篇论文并转成 Markdown 文件
 
-搜索数据源（免费无需 Key，多源降级）：Semantic Scholar（主，覆盖广）→ OpenAlex（含开放获取 PDF）→ arXiv（预印本）。还可手动指定 Crossref（DOI 元数据）、PubMed（生物医学）。下载源见下。详见 [`references/api_notes.md`](references/api_notes.md)。
+搜索数据源（免费无需 Key，多源降级）：Semantic Scholar（主，覆盖广）→ OpenAlex（含开放获取 PDF）→ arXiv（预印本）。还可手动指定 Crossref（DOI 元数据）、PubMed（生物医学）、DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）。下载源见下。详见 [`references/api_notes.md`](references/api_notes.md)。
 
 ### 环境准备
 
@@ -55,23 +55,23 @@ search (检索下载原始论文) → paper (写作) → integrity 审查 → re
 pip install requests pdfplumber pymupdf --break-system-packages -q
 ```
 
-这两个脚本需要访问外网（`api.semanticscholar.org` / `api.openalex.org` / `api.crossref.org` / `eutils.ncbi.nlm.nih.gov` / `export.arxiv.org` / `arxiv.org`）。如果当前环境的网络策略不允许访问这些域名（`bash` 报 `host_not_allowed` 或类似拒绝信息），先告知用户，并建议其在允许联网的环境（本地终端 / Claude Code）中运行——不要假装成功或编造结果。
+这两个脚本需要访问外网（`api.semanticscholar.org` / `api.openalex.org` / `api.crossref.org` / `eutils.ncbi.nlm.nih.gov` / `export.arxiv.org` / `arxiv.org` / `dblp.org` / `www.ebi.ac.uk` / `api.core.ac.uk` / `api.unpaywall.org`）。如果当前环境的网络策略不允许访问这些域名（`bash` 报 `host_not_allowed` 或类似拒绝信息），先告知用户，并建议其在允许联网的环境（本地终端 / Claude Code）中运行——不要假装成功或编造结果。
 
 两个脚本内置了瞬时错误重试（429/5xx 自动重试2次，指数退避），单次失败不代表真的不可用，可以先重跑一次。
 
 ### 接口一：搜索论文
 
 ```bash
-python scripts/search_papers.py "<关键词或标题>" [--mode topic|title] [--source auto|multi|semanticscholar|openalex|crossref|pubmed|arxiv] [--limit 20] [--json]
+python scripts/search_papers.py "<关键词或标题>" [--mode topic|title] [--source auto|multi|semanticscholar|openalex|crossref|pubmed|arxiv|dblp|europmc|core] [--limit 20] [--json]
 ```
 
 - 主题搜索（默认）：`python scripts/search_papers.py "large language model reasoning"`
 - 按论文标题精确查找：`python scripts/search_papers.py "Attention Is All You Need" --mode title`
-- **多平台聚合（推荐，覆盖最广）**：`--source multi` 串行查 OpenAlex+Crossref+arXiv，结果合并去重并按来源轮转排序，保证三个平台都有代表进入结果，而非单一平台独占前几名。
-- 指定单平台：`--source openalex`（含开放 PDF）/ `crossref`（DOI 权威）/ `pubmed`（生物医学）/ `arxiv`（预印本）
+- **多平台聚合（推荐，覆盖最广）**：`--source multi` 串行查 OpenAlex+Crossref+arXiv+DBLP+Europe PMC，结果合并去重并按来源轮转排序，保证各平台都有代表进入结果，而非单一平台独占前几名。
+- 指定单平台：`--source openalex`（含开放 PDF）/ `crossref`（DOI 权威）/ `pubmed`（生物医学）/ `arxiv`（预印本）/ `dblp`（CS 领域权威）/ `europmc`（生物医学全文）/ `core`（全球最大 OA 聚合库，需设置 `CORE_API_KEY` 环境变量）
 - 需要程序化处理时用 `--json`，否则默认输出人类可读的列表
 
-`--source auto`（默认）依次尝试 S2→OpenAlex→arXiv，首个非空结果即返回——这样任一平台限流/无数据都不会阻断搜索。`--source multi` 则三者都查并合并去重，覆盖面更广但耗时更长（约 3 倍）。默认 `--limit 20`。
+`--source auto`（默认）依次尝试 S2→OpenAlex→arXiv，首个非空结果即返回——这样任一平台限流/无数据都不会阻断搜索。`--source multi` 则多平台都查并合并去重，覆盖面更广但耗时更长。默认 `--limit 20`。
 
 每条结果包含：标题、作者、发表时间、来源期刊/venue、arXiv ID / DOI / PMID / Semantic Scholar ID（用于后续下载）、PDF 链接（若可获取）、摘要片段。
 
@@ -93,6 +93,8 @@ python scripts/download_paper.py "<标识符>" -o output.md
 | 直接 PDF 链接 | `https://arxiv.org/pdf/2306.12345` |
 
 流程：解析标识符 → **先反查是否有 arXiv 版本（用户直接给 arXiv ID 时就是它本身；给 DOI / S2 ID 时，从 Semantic Scholar 的 `externalIds.ArXiv` 反查）**→ **有 arXiv 版本则优先下载 LaTeX 源码包并用 Pandoc 转成 Markdown，公式保留为标准 `$...$` / `$$...$$`（无损，结构最完整）；反查不到 arXiv 或只有 PDF（作者未提交源码、或 Pandoc 不可用）时降级用 `pymupdf` 提取 PDF 正文和图片** → 写出包含标题/作者/发表时间/来源/摘要/正文的 Markdown 文件。
+
+**OA PDF 解析链**（DOI 下载时）：Semantic Scholar `openAccessPdf` → Unpaywall（按 DOI 反查 OA 链接，覆盖 1.2 亿+ DOI，需设置 `UNPAYWALL_EMAIL` 环境变量为真实邮箱）→ arXiv PDF。Unpaywall 常能找到 S2 遗漏的机构仓库版本，显著提升 DOI 论文的下载成功率。未设置 `UNPAYWALL_EMAIL` 时自动跳过 Unpaywall，不影响其他路径。
 
 图片处理：两种转换路径均会将图片提取到输出 Markdown 同级的 `images/` 目录，Markdown 中以相对路径引用（如 `![figure](images/fig1.png)`）。LaTeX 源码路径通过 Pandoc 的 `--extract-media` 提取；PDF 路径通过 `pymupdf` 提取嵌入图片（跳过 < 5KB 的小图标，自动去重）。
 

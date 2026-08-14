@@ -2,7 +2,7 @@
   "name": "liuxiang",
   "description": "学术研究全流程套件。四个模块：search（论文搜索与下载，脚本驱动，默认）、paper（12-agent 论文写作，10 模式，6 论文类型，5 引用格式，双语摘要，LaTeX/DOCX/PDF 输出）、reviewer（7-agent 多视角同行评审，6 模式）、pipeline（端到端 10 阶段流水线：研究→写作→诚信审查→同行评审→修订→定稿）。",
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Kirky-X",
   "repo": "https://github.com/Kirky-X/liuxiang",
   "homepage": "https://github.com/Kirky-X/liuxiang",

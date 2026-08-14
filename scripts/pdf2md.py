@@ -21,7 +21,7 @@ import argparse
 import hashlib
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 - pandoc/pdftotext 转换需要
 import sys
 import tempfile
 import urllib.request
@@ -29,10 +29,13 @@ from pathlib import Path
 
 
 def download_pdf(url: str, dest: Path) -> None:
+    # 限制 URL scheme 为 http/https，防止 file:// 等本地路径泄露
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"不支持的 URL scheme: {url.split(':', 1)[0]}（仅允许 http/https）")
     req = urllib.request.Request(
         url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) arxiv-skill/1.0"}
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310 - URL scheme 已校验
         dest.write_bytes(resp.read())
 
 
@@ -48,7 +51,7 @@ def convert_with_pandoc(pdf_path: Path, images_dir: Path | None = None) -> str |
         images_dir.mkdir(parents=True, exist_ok=True)
         cmd.append(f"--extract-media={images_dir.resolve()}")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)  # nosec B603 - pandoc 命令，参数为本地文件路径
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -64,7 +67,7 @@ def convert_with_pdfminer(pdf_path: Path) -> str | None:
         text = extract_text(pdf_path)
         if text.strip():
             return text
-    except Exception:
+    except Exception:  # nosec B110 - pdfminer 转换失败时静默降级到下一个后端
         pass
     return None
 
@@ -73,7 +76,7 @@ def convert_with_pdftotext(pdf_path: Path) -> str | None:
     if not shutil.which("pdftotext"):
         return None
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607 - pdftotext 为系统工具，参数为本地 PDF 路径
             ["pdftotext", "-layout", str(pdf_path), "-"],
             capture_output=True,
             text=True,
@@ -114,7 +117,7 @@ def extract_pdf_images(pdf_path: Path, images_dir: Path) -> dict[int, list[str]]
                         continue
 
                     # 去重：相同内容的图片只保存一次
-                    img_hash = hashlib.md5(image_bytes).hexdigest()[:12]
+                    img_hash = hashlib.md5(image_bytes, usedforsecurity=False).hexdigest()[:12]
                     if img_hash in seen_hashes:
                         continue
                     seen_hashes.add(img_hash)
@@ -125,7 +128,7 @@ def extract_pdf_images(pdf_path: Path, images_dir: Path) -> dict[int, list[str]]
                     filepath.write_bytes(image_bytes)
 
                     page_images.setdefault(page_idx, []).append(filename)
-                except Exception:
+                except Exception:  # nosec B112 - 单张图片提取失败不影响整体流程
                     continue
 
     return page_images
@@ -133,7 +136,7 @@ def extract_pdf_images(pdf_path: Path, images_dir: Path) -> dict[int, list[str]]
 
 def convert_raw_text(pdf_path: Path) -> str:
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607 - pdftotext 为系统工具，参数为本地 PDF 路径
             ["pdftotext", str(pdf_path), "-"],
             capture_output=True,
             text=True,

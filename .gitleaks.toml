@@ -1,0 +1,7 @@
+title = "gitleaks config"
+
+[allowlist]
+description = "exclude example files containing arXiv IDs"
+paths = [
+    '''examples/''',
+]

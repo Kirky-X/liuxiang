@@ -17,6 +17,8 @@ download_paper.py — 论文下载并转换为 Markdown（接口二）
   - 两种路径均会将图片提取到输出 Markdown 同级的 images/ 目录，Markdown
     中以相对路径引用。
 
+OA PDF 解析链：Semantic Scholar openAccessPdf → Unpaywall（DOI 反查 OA 链接）→ arXiv
+
 用法：
     python download_paper.py 2306.12345 -o paper.md
     python download_paper.py 649def34f8be52c8b66281af98ae884c09aef38b -o paper.md
@@ -27,6 +29,8 @@ download_paper.py — 论文下载并转换为 Markdown（接口二）
     ARXIV_PDF_BASE     默认 https://arxiv.org/pdf
     ARXIV_EPRINT_URL   默认 https://arxiv.org/e-print/{id}
     ARXIV_API_URL      默认 https://export.arxiv.org/api/query
+    UNPAYWALL_API_URL  默认 https://api.unpaywall.org/v2
+    UNPAYWALL_EMAIL    Unpaywall 礼貌池邮箱（必须是真实邮箱，example.com 会被拒）
 """
 
 import argparse
@@ -39,8 +43,9 @@ import sys
 import tarfile
 import tempfile
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - 仅用于 findall/findtext，解析已改用 defusedxml
 
+import defusedxml.ElementTree as defused_ET
 import requests
 
 S2_PAPER_URL = os.environ.get("S2_PAPER_URL", "https://api.semanticscholar.org/graph/v1/paper/{id}")
@@ -49,6 +54,10 @@ ARXIV_PDF_BASE = os.environ.get("ARXIV_PDF_BASE", "https://arxiv.org/pdf")
 ARXIV_EPRINT_URL = os.environ.get("ARXIV_EPRINT_URL", "https://arxiv.org/e-print/{id}")
 # 与 search_papers.py 保持一致，必须用 https 以避免 http→301 重定向的间歇性超时。
 ARXIV_API_URL = os.environ.get("ARXIV_API_URL", "https://export.arxiv.org/api/query")
+# Unpaywall：DOI → OA PDF 链接解析。需要真实邮箱（example.com 会被拒）。
+# 未设置或邮箱无效时自动跳过，不影响其他下载路径。
+UNPAYWALL_API_URL = os.environ.get("UNPAYWALL_API_URL", "https://api.unpaywall.org/v2")
+UNPAYWALL_EMAIL = os.environ.get("UNPAYWALL_EMAIL", "")
 
 # 新格式：2306.12345 / 2306.12345v2；旧格式（2007年前）：hep-th/9901001、math.GT/0309136
 ARXIV_ID_RE = re.compile(
@@ -133,7 +142,7 @@ def fetch_arxiv_meta(arxiv_id: str):
         return None
     ns = {"atom": "http://www.w3.org/2005/Atom"}
     try:
-        root = ET.fromstring(resp.text)
+        root = defused_ET.fromstring(resp.text)
     except ET.ParseError:
         return None
     entry = root.find("atom:entry", ns)
@@ -149,6 +158,38 @@ def fetch_arxiv_meta(arxiv_id: str):
         "abstract": " ".join((entry.findtext("atom:summary", default="", namespaces=ns) or "").split()) or None,
         "venue": "arXiv",
     }
+
+
+def fetch_unpaywall_pdf(doi: str) -> str | None:
+    """通过 Unpaywall 按 DOI 查找 OA PDF 链接。返回最佳 OA URL，找不到或邮箱无效返回 None。
+
+    Unpaywall 覆盖 1.2 亿+ DOI，常能找到 S2 遗漏的机构仓库版本。
+    需要真实邮箱（example.com 会被拒），未设置 UNPAYWALL_EMAIL 时直接跳过。
+    """
+    if not UNPAYWALL_EMAIL:
+        return None
+    url = f"{UNPAYWALL_API_URL}/{doi}"
+    try:
+        resp = _get_with_retry(url, params={"email": UNPAYWALL_EMAIL}, timeout=15)
+    except requests.exceptions.RequestException:
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except ValueError:
+        return None
+    if not data.get("is_oa"):
+        return None
+    # 优先用 best_oa_location（Unpaywall 已排序）
+    best = data.get("best_oa_location") or {}
+    if best.get("url"):
+        return best["url"]
+    # 兑底：遍历所有 oa_locations 找第一个有 URL 的
+    for loc in (data.get("oa_locations") or []):
+        if loc.get("url"):
+            return loc["url"]
+    return None
 
 
 def resolve_metadata(identifier: str):
@@ -188,7 +229,12 @@ def resolve_metadata(identifier: str):
         if not meta:
             raise RuntimeError(f"未能找到 DOI {identifier} 对应的论文（Semantic Scholar 暂未收录）。")
         if not meta.get("pdf_url") and not meta.get("arxiv_id"):
-            raise RuntimeError(f"未能找到 DOI {identifier} 对应的开放获取 PDF（该论文可能没有免费全文）。")
+            # S2 没有 OA PDF 也没有 arXiv 版本，尝试 Unpaywall 按 DOI 反查
+            up_pdf = fetch_unpaywall_pdf(identifier)
+            if up_pdf:
+                meta["pdf_url"] = up_pdf
+            else:
+                raise RuntimeError(f"未能找到 DOI {identifier} 对应的开放获取 PDF（该论文可能没有免费全文）。")
         # 优先用正式发表版信息（venue 为真实期刊/会议），PDF 兑底（无 arXiv 版本时必需）。
         pdf_url = meta.get("pdf_url") or f"{ARXIV_PDF_BASE}/{meta['arxiv_id']}"
         return meta, pdf_url, meta.get("arxiv_id")
@@ -198,6 +244,7 @@ def resolve_metadata(identifier: str):
     if not meta:
         raise RuntimeError(f"未能找到标识符 {identifier} 对应的论文（Semantic Scholar 暂未收录，或标识符有误）。")
     if not meta.get("pdf_url") and not meta.get("arxiv_id"):
+        # S2 ID 无法反查 DOI，Unpaywall 需要 DOI，此处无法使用
         raise RuntimeError(f"未能找到标识符 {identifier} 对应的开放获取 PDF（该论文可能没有免费全文，仅摘要可用，或标识符有误）。")
     pdf_url = meta.get("pdf_url") or f"{ARXIV_PDF_BASE}/{meta['arxiv_id']}"
     return meta, pdf_url, meta.get("arxiv_id")
@@ -249,7 +296,7 @@ def pdf_to_markdown_body(pdf_path: str, images_dir: str | None = None) -> str:
                             continue
 
                         # 去重：相同内容的图片只保存一次
-                        img_hash = hashlib.md5(image_bytes).hexdigest()[:12]
+                        img_hash = hashlib.md5(image_bytes, usedforsecurity=False).hexdigest()[:12]
                         if img_hash in seen_hashes:
                             continue
                         seen_hashes.add(img_hash)
@@ -263,7 +310,7 @@ def pdf_to_markdown_body(pdf_path: str, images_dir: str | None = None) -> str:
                         page_image_refs.setdefault(page_idx, []).append(
                             (filename, "figure")
                         )
-                    except Exception:
+                    except Exception:  # nosec B112 - 单张图片提取失败不影响整体流程
                         continue
 
             parts.append(f"<!-- page {page_idx} -->\n\n{text}")

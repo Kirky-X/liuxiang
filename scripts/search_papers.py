@@ -6,16 +6,27 @@ search_papers.py — 学术论文搜索（接口一）
 
 主搜索源：Semantic Scholar（覆盖期刊+预印本，免费，无需 API Key）
 兜底搜索源：arXiv（当 Semantic Scholar 请求失败/超限/无结果时自动切换，仅覆盖预印本）
+其他可用源：OpenAlex（开放学术图谱）、Crossref（DOI 元数据）、PubMed（生物医学）、
+            DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）
 
 用法：
     python search_papers.py "quantum computing" --limit 10
     python search_papers.py "Attention Is All You Need" --mode title
     python search_papers.py "large language model" --source arxiv --limit 5
-    python search_papers.py "generative ai" --json > results.json
+    python search_papers.py "generative ai" --source multi --json
+    python search_papers.py "transformer" --source dblp --limit 10
+    python search_papers.py "CRISPR" --source europmc --limit 5
 
 环境变量（一般不需要设置，测试/自建镜像时可覆盖）：
     S2_SEARCH_URL   默认 https://api.semanticscholar.org/graph/v1/paper/search
-    ARXIV_API_URL   默认 http://export.arxiv.org/api/query
+    ARXIV_API_URL   默认 https://export.arxiv.org/api/query
+    OPENALEX_API_URL 默认 https://api.openalex.org/works
+    CROSSREF_API_URL 默认 https://api.crossref.org/works
+    DBLP_API_URL    默认 https://dblp.org/search/publ/api
+    EUROPEPMC_API_URL 默认 https://www.ebi.ac.uk/europepmc/webservices/rest/search
+    CORE_API_URL    默认 https://api.core.ac.uk/v3/search/works
+    CORE_API_KEY    CORE API Key（免费注册 https://core.ac.uk/api-keys，未设置时跳过）
+    LIUXIANG_EMAIL  礼貌池联系邮箱（Crossref/OpenAlex 推荐）
 """
 
 import argparse
@@ -24,8 +35,9 @@ import os
 import re
 import sys
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - 仅用于 findall/findtext，解析已改用 defusedxml
 
+import defusedxml.ElementTree as defused_ET
 import requests
 
 S2_SEARCH_URL = os.environ.get("S2_SEARCH_URL", "https://api.semanticscholar.org/graph/v1/paper/search")
@@ -33,18 +45,25 @@ S2_FIELDS = "title,authors,year,publicationDate,abstract,externalIds,openAccessP
 # 注意：必须用 https。arXiv 会把 http://export.arxiv.org 301 重定向到 https，
 # 而 requests 跟随该重定向时常出现间歇性读超时，直接用 https 可省去这次往返。
 ARXIV_API_URL = os.environ.get("ARXIV_API_URL", "https://export.arxiv.org/api/query")
-# 以下三个平台均免费、无需 API Key（OpenAlex 2026.2 起需 Key，届时加 OPENALEX_EMAIL 环境变量进礼貌池即可）。
-OPENALEX_API_URL = os.environ.get("OPENALEX_API_URL", "https://api.openalex.org/works")
-CROSSREF_API_URL = os.environ.get("CROSSREF_API_URL", "https://api.crossref.org/works")
-PUBMED_ESEARCH_URL = os.environ.get("PUBMED_ESEARCH_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi")
-PUBMED_ESUMMARY_URL = os.environ.get("PUBMED_ESUMMARY_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi")
-# Crossref/OpenAlex 鼓励带联系邮箱进入“礼貌用户池”（更高速率限制），不强制但推荐。
+# 以下平台均免费。Crossref/OpenAlex 鼓励带联系邮箱进入"礼貌用户池"（更高速率限制），不强制但推荐。
 CONTACT_EMAIL = os.environ.get("LIUXIANG_EMAIL", "liuxiang@example.com")
+DBLP_API_URL = os.environ.get("DBLP_API_URL", "https://dblp.org/search/publ/api")
+EUROPEPMC_API_URL = os.environ.get("EUROPEPMC_API_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest/search")
+# CORE 需要 API Key（免费注册 https://core.ac.uk/api-keys，免费层 10k 请求/月）。
+# 未设置 CORE_API_KEY 时 CORE 源自动跳过。
+CORE_API_URL = os.environ.get("CORE_API_URL", "https://api.core.ac.uk/v3/search/works")
+CORE_API_KEY = os.environ.get("CORE_API_KEY", "")
 
 # 瞬时错误（限流/网络抖动）重试次数与间隔。429/5xx 才重试，4xx（除429）直接放弃。
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRIES = 2
 RETRY_BACKOFF_SECONDS = 1.5
+
+# 保留原有 URL 常量（向后兼容）
+OPENALEX_API_URL = os.environ.get("OPENALEX_API_URL", "https://api.openalex.org/works")
+CROSSREF_API_URL = os.environ.get("CROSSREF_API_URL", "https://api.crossref.org/works")
+PUBMED_ESEARCH_URL = os.environ.get("PUBMED_ESEARCH_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi")
+PUBMED_ESUMMARY_URL = os.environ.get("PUBMED_ESUMMARY_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi")
 
 
 def _get_with_retry(url: str, params: dict, timeout: int = 15) -> requests.Response:
@@ -151,7 +170,7 @@ def search_arxiv(query: str, limit: int, mode: str):
     raw = resp.text
 
     ns = {"atom": "http://www.w3.org/2005/Atom"}
-    root = ET.fromstring(raw)
+    root = defused_ET.fromstring(raw)
 
     results = []
     for entry in root.findall("atom:entry", ns):
@@ -339,11 +358,157 @@ def search_pubmed(query: str, limit: int, mode: str):
     return results
 
 
+def search_dblp(query: str, limit: int, mode: str):
+    """DBLP /search/publ/api 搜索。免费无 Key，CS 领域期刊/会议最权威的书目数据库。
+
+    返回 JSON 格式，字段包括 title/authors/venue/year/doi/ee（电子链接）。DBLP 不提供摘要，
+    但 venue 数据极其规范（精确到会议/期刊名+卷号），是 CS 领域论文定位的最佳来源。
+    """
+    params = {
+        "q": query,
+        "format": "json",
+        "h": min(limit, 1000),
+    }
+    resp = _get_with_retry(DBLP_API_URL, params, timeout=15)
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise RuntimeError(f"DBLP 返回了无法解析的内容: {e}")
+
+    results = []
+    hits = (data.get("result") or {}).get("hits") or {}
+    for hit in hits.get("hit") or []:
+        info = hit.get("info") or {}
+        # DBLP 的 authors 可能是 dict（单作者）或 list
+        raw_authors = info.get("authors", {}).get("author", [])
+        if isinstance(raw_authors, dict):
+            raw_authors = [raw_authors]
+        authors = []
+        for a in raw_authors:
+            if isinstance(a, dict):
+                authors.append(a.get("text", ""))
+            else:
+                authors.append(str(a))
+        # ee 是电子链接列表（PDF/HTML 全文），取第一个作为 pdf_url 候选
+        ee = info.get("ee") or []
+        if isinstance(ee, str):
+            ee = [ee]
+        pdf_url = None
+        page_url = info.get("url")
+        for link in ee:
+            if link.endswith(".pdf") or "/pdf/" in link:
+                pdf_url = link
+                break
+        results.append(_norm_result(
+            title=info.get("title"),
+            authors=authors,
+            published=info.get("year"),
+            abstract=None,  # DBLP 不提供摘要
+            venue=info.get("venue"),
+            doi=info.get("doi"),
+            pdf_url=pdf_url,
+            page_url=page_url or (ee[0] if ee else None),
+            source="dblp",
+        ))
+    return results
+
+
+def search_europmc(query: str, limit: int, mode: str):
+    """Europe PMC RESTful 搜索。免费无 Key，生物医学领域全文库（含 PubMed 全部内容 + 810 万+ 全文）。
+
+    比 PubMed 多了全文 XML（OA 论文）和 preprint 支持。返回 JSON，resultType='core' 时包含
+    fullTextUrlList（全文链接列表）。NCBI 建议 3 RPS，_get_with_retry 的重试间隔能覆盖。
+    """
+    params = {
+        "query": query,
+        "format": "json",
+        "pageSize": min(limit, 100),
+        "resultType": "core",
+    }
+    resp = _get_with_retry(EUROPEPMC_API_URL, params, timeout=20)
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise RuntimeError(f"Europe PMC 返回了无法解析的内容: {e}")
+
+    results = []
+    for rec in (data.get("resultList") or {}).get("result") or []:
+        authors = [a.get("fullName", "") for a in (rec.get("authorList") or {}).get("author") or []][:6]
+        doi = rec.get("doi") or None
+        # 从 fullTextUrlList 中提取 OA 全文 PDF 链接
+        pdf_url = None
+        ftu_list = (rec.get("fullTextUrlList") or {}).get("fullTextUrl") or []
+        for ftu in ftu_list:
+            if ftu.get("availabilityCode") == "O" and ftu.get("documentStyle") == "pdf":
+                pdf_url = ftu.get("url")
+                break
+        if not pdf_url:
+            for ftu in ftu_list:
+                if ftu.get("availabilityCode") in ("O", "F") and ftu.get("documentStyle") == "pdf":
+                    pdf_url = ftu.get("url")
+                    break
+        results.append(_norm_result(
+            title=rec.get("title"),
+            authors=authors,
+            published=rec.get("firstPublicationDate"),
+            abstract=rec.get("abstractText"),
+            venue=rec.get("journalTitle"),
+            doi=doi,
+            pmid=rec.get("pmid"),
+            pdf_url=pdf_url,
+            page_url=f"https://europepmc.org/article/MED/{rec.get('id')}" if rec.get("id") else None,
+            source="europmc",
+        ))
+    return results
+
+
+def search_core(query: str, limit: int, mode: str):
+    """CORE /v3/search/works 搜索。全球最大 OA 聚合库（3 亿+ 论文），需 API Key。
+
+    未设置 CORE_API_KEY 环境变量时抛出 RuntimeError 提示用户注册。
+    CORE 返回的 downloadUrl 是 OA PDF 直链，与下载接口衔接好。
+    """
+    if not CORE_API_KEY:
+        raise RuntimeError("CORE 需要 API Key（免费注册：https://core.ac.uk/api-keys）。未设置 CORE_API_KEY 环境变量，跳过。")
+    params = {
+        "q": query,
+        "limit": min(limit, 100),
+    }
+    headers = {"Authorization": f"Bearer {CORE_API_KEY}", "Content-Type": "application/json"}
+    resp = requests.post(CORE_API_URL, json=params, headers=headers, timeout=20)
+    if resp.status_code in RETRYABLE_STATUS:
+        time.sleep(RETRY_BACKOFF_SECONDS)
+        resp = requests.post(CORE_API_URL, json=params, headers=headers, timeout=20)
+    resp.raise_for_status()
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise RuntimeError(f"CORE 返回了无法解析的内容: {e}")
+
+    results = []
+    for w in data.get("results") or []:
+        authors = [a.get("name", "") for a in (w.get("authors") or [])][:6]
+        doi = (w.get("doi") or "").replace("https://doi.org/", "") or None
+        results.append(_norm_result(
+            title=w.get("title"),
+            authors=authors,
+            published=w.get("publishedDate") or w.get("yearPublished"),
+            abstract=(w.get("abstract") or "")[:500] or None,
+            venue=w.get("publisher") or w.get("journalTitle"),
+            doi=doi,
+            pdf_url=w.get("downloadUrl"),
+            page_url=w.get("sourceFulltextUrls") or w.get("identifier"),
+            source="core",
+        ))
+    return results
+
+
 # 来源优先级：用于聚合去重后排序（被多平台收录的排前，同分时按此优先级）
-# S2/OpenAlex 元数据质量最高，arXiv 次之，Crossref/PubMed 补充。
-_SOURCE_PRIORITY = {"semantic_scholar": 0, "openalex": 1, "arxiv": 2, "crossref": 3, "pubmed": 4}
+# S2/OpenAlex 元数据质量最高，arXiv/DBLP 次之，Crossref/PubMed/EuropePMC 补充。
+_SOURCE_PRIORITY = {"semantic_scholar": 0, "openalex": 1, "arxiv": 2, "dblp": 3, "crossref": 4, "pubmed": 5, "europmc": 6, "core": 7}
 # multi 聚合默认查询的源（排除限流敏感的 S2：多源并发会加剧其 429）
-_MULTI_SOURCES = ["openalex", "crossref", "arxiv"]
+# CORE 需 Key，未设置时自动跳过；DBLP/EuropePMC 免费无 Key 稳定可用。
+_MULTI_SOURCES = ["openalex", "crossref", "arxiv", "dblp", "europmc"]
 
 
 def _dedup_key(p: dict) -> str | None:
@@ -439,6 +604,12 @@ def run_search(query: str, limit: int, mode: str, source: str):
         return search_crossref(query, limit, mode)
     if source == "pubmed":
         return search_pubmed(query, limit, mode)
+    if source == "dblp":
+        return search_dblp(query, limit, mode)
+    if source == "europmc":
+        return search_europmc(query, limit, mode)
+    if source == "core":
+        return search_core(query, limit, mode)
 
     # auto: 多源串联，首个返回非空结果的源即用，避免单一平台限流/无数据阻断
     # 优先级：Semantic Scholar（覆盖广）→ OpenAlex（含 OA PDF）→ arXiv（预印本，纯预印本话题命中率高）
@@ -467,7 +638,12 @@ def _run_multi_search(query: str, limit: int, mode: str):
         "openalex": ("OpenAlex", search_openalex),
         "crossref": ("Crossref", search_crossref),
         "arxiv": ("arXiv", search_arxiv),
+        "dblp": ("DBLP", search_dblp),
+        "europmc": ("Europe PMC", search_europmc),
     }
+    # CORE 需 API Key，有 Key 时才加入聚合
+    if CORE_API_KEY:
+        sources["core"] = ("CORE", search_core)
     per_source: dict = {}
     ok_sources = []
     for key, (name, fn) in sources.items():
@@ -527,7 +703,7 @@ def main():
     ap = argparse.ArgumentParser(description="学术论文搜索")
     ap.add_argument("query", help="搜索的主题关键词，或论文标题（配合 --mode title）")
     ap.add_argument("--mode", choices=["topic", "title"], default="topic", help="搜索模式：topic=主题关键词，title=论文标题")
-    ap.add_argument("--source", choices=["auto", "multi", "semanticscholar", "openalex", "crossref", "pubmed", "arxiv"], default="auto", help="搜索源：auto=依次降级(S2→OpenAlex→arXiv)；multi=多平台聚合去重(覆盖最广)；也可单指定 openalex/crossref/pubmed/arxiv/semanticscholar")
+    ap.add_argument("--source", choices=["auto", "multi", "semanticscholar", "openalex", "crossref", "pubmed", "arxiv", "dblp", "europmc", "core"], default="auto", help="搜索源：auto=依次降级(S2→OpenAlex→arXiv)；multi=多平台聚合去重(覆盖最广)；也可单指定 openalex/crossref/pubmed/arxiv/semanticscholar/dblp/europmc/core")
     ap.add_argument("--limit", type=int, default=20, help="返回结果数量，默认 20（multi 模式下去重后可能不足此数，取决于多源重叠程度）")
     ap.add_argument("--json", action="store_true", help="以 JSON 格式输出（供程序处理），默认人类可读格式")
     args = ap.parse_args()
