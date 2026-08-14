@@ -1,6 +1,6 @@
 # Liuxiang (刘向) —— 学术研究全流程套件
 
-[English](README_EN.md)
+中文 | [English](README_EN.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/Kirky-X/liuxiang?style=flat-square)](https://github.com/Kirky-X/liuxiang/releases) [![GitHub License](https://img.shields.io/github/license/Kirky-X/liuxiang?style=flat-square)](LICENSE)
 
