@@ -43,8 +43,8 @@ Standalone interface for converting local PDF files to Markdown, including image
 # Install to Claude Code
 npx skills add Kirky-X/liuxiang --agent claude-code -y
 
-# Install to Trae
-npx skills add Kirky-X/liuxiang --agent trae -y
+# Install to Codex
+npx skills add Kirky-X/liuxiang --agent codex -y
 ```
 
 ### Option 2: Traditional git clone

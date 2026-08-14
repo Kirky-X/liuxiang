@@ -43,8 +43,8 @@ Liuxiang 是面向 AI agent 的学术研究全流程 skill，覆盖从文献检�
 # 安装到 Claude Code
 npx skills add Kirky-X/liuxiang --agent claude-code -y
 
-# 安装到 Trae
-npx skills add Kirky-X/liuxiang --agent trae -y
+# 安装到 Codex
+npx skills add Kirky-X/liuxiang --agent codex -y
 ```
 
 ### 方式二：传统 git clone
