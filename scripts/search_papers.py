@@ -35,7 +35,6 @@ import os
 import re
 import sys
 import time
-import xml.etree.ElementTree as ET  # nosec B405 - 仅用于 findall/findtext，解析已改用 defusedxml
 
 import defusedxml.ElementTree as defused_ET
 import requests
