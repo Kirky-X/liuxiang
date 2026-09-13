@@ -1,109 +1,92 @@
 # Liuxiang — Academic Research Suite
 
-[中文](README.md) | English
+> An AI agent skill covering the full academic lifecycle from literature search to final paper: script-driven paper discovery, 12-agent paper writing, 7-agent peer review, and an end-to-end pipeline — four modules that work independently or together.
 
-[![GitHub Release](https://img.shields.io/github/v/release/Kirky-X/liuxiang?style=flat-square)](https://github.com/Kirky-X/liuxiang/releases) [![GitHub License](https://img.shields.io/github/license/Kirky-X/liuxiang?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FKirky-X%2Fliuxiang%2Fmain%2Fskill.json&query=%24.version&label=version&style=flat-square)](https://github.com/Kirky-X/liuxiang/releases) [![GitHub Release](https://img.shields.io/github/v/release/Kirky-X/liuxiang?style=flat-square)](https://github.com/Kirky-X/liuxiang/releases) [![GitHub License](https://img.shields.io/github/license/Kirky-X/liuxiang?style=flat-square)](LICENSE)
 
-Liuxiang is an AI agent skill for the full academic research lifecycle — from literature search to paper finalization. Four independent yet composable modules cover multi-source paper discovery, lossless LaTeX/PDF conversion, multi-agent paper writing, and peer review.
+English | [中文](README.md)
 
-## Features
+## ✨ Features
 
-### Four Modules
+**Four modules** (`$ARGUMENTS[0]` selects; defaults to search):
 
-| Module | Description | Implementation |
+| Module | Description | Measured scale |
 | ------ | ----------- | -------------- |
-| **search** (default) | Paper search & download to Markdown | Script-driven (Semantic Scholar / OpenAlex / arXiv multi-source) |
-| **paper** | 12-agent paper writing (10 modes, 6 paper types, 5 citation formats) | Multi-agent |
-| **reviewer** | 7-agent multi-perspective peer review (6 modes) | Multi-agent |
-| **pipeline** | End-to-end 10-stage workflow (research → writing → integrity → review → revision → final) | Orchestrator |
+| **search** (default) | Paper search & download to Markdown, script-driven | 8 sources: Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE; `--source multi` aggregates with dedup; automatic multi-source fallback |
+| **paper** | 12-agent paper writing | 10 modes (full / plan / outline / revision / abstract / lit-review / format-convert / citation-check / disclosure, etc.), 6 paper types, 5 citation formats, bilingual abstract, LaTeX/DOCX/PDF output |
+| **reviewer** | 7-agent multi-perspective peer review | 6 modes (full / re-review / quick / methodology-focus / guided / calibration) |
+| **pipeline** | End-to-end 10-stage pipeline | research → writing → integrity review → review → revision → finalization; an orchestrator drives paper/reviewer |
 
-### Multi-Source Paper Search
+- **Lossless conversion**: download prefers the arXiv LaTeX source path (tarball → Pandoc, math preserved as `$...$`/`$$...$$`), falls back to PDF extraction (pymupdf), then to the arXiv HTML converter; DOI / S2 IDs are auto-resolved to arXiv versions.
+- **Hardened**: `download_paper.py` has SSRF protection (scheme whitelist + rejection of targets resolving to local/link-local addresses) and tar-safe extraction (rejects path traversal, symlinks, and non-regular-file members).
+- **Post-fix state**: SKILL.md slimmed to 3.8KB with search usage externalized to `reference/search.md`; ~130 dangling references resolved — 90 repointed to real assets, the remaining 49 (13 files) explicitly marked "⚠️ 依赖缺失，当前版本未实现" (upstream ARS shared contracts and compliance/raise frameworks have no equivalent here), zero unmarked leftovers.
+- **search → paper/pipeline handoff**: search output (a Markdown full-text list) is the input corpus for paper's literature strategist agent and pipeline Stage 1; the handoff format is in `reference/search.md` § "与其他模块的衔接".
 
-- **Semantic Scholar** (primary) → **OpenAlex** (incl. open-access PDFs) → **arXiv** (preprints)
-- Supports Crossref (DOI authority) and PubMed (biomedical)
-- Free, no API key required, automatic multi-source fallback
-- `--source multi` aggregates and deduplicates across three platforms for broadest coverage
-
-### Lossless Paper Conversion
-
-- **LaTeX source path** (preferred): downloads arXiv tarball, Pandoc converts to Markdown, formulas preserved as `$...$` / `$$...$$` (lossless)
-- **PDF extraction path** (fallback): pymupdf text extraction + embedded images
-- Images auto-extracted to `images/` directory; PDF vector graphics auto-converted to PNG
-- Supports DOI / S2 ID reverse lookup for arXiv version to use the lossless path
-
-### Local PDF to Markdown
-
-Standalone interface for converting local PDF files to Markdown, including image extraction.
-
-## Installation
-
-### Option 1: Via `skills` package (recommended)
+## 📦 Installation
 
 ```bash
-# Install to Claude Code
+# Option 1: deploy from this workspace (to ~/.zcode/skills and ~/.claude/skills)
+bash scripts/sync-skills.sh liuxiang
+
+# Option 2: manual copy into the ZCode skills directory
+cp -r /path/to/liuxiang ~/.zcode/skills/liuxiang
+
+# Option 3: remote install from GitHub
 npx skills add Kirky-X/liuxiang --agent claude-code -y
-
-# Install to Codex
-npx skills add Kirky-X/liuxiang --agent codex -y
 ```
 
-### Option 2: Traditional git clone
+Dependencies: Python 3.8+ with `requests httpx beautifulsoup4 lxml pdfminer.six pymupdf` (a `pip install` away; the search APIs are free and keyless); Pandoc is an optional dependency for the lossless LaTeX path.
+
+## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/Kirky-X/liuxiang.git
-# Link or copy SKILL.md + scripts/ + reference/ + agents/ to the agent skills directory
+# 1. Search papers (multi-source; when Semantic Scholar rate-limits with 429, the script falls back to OpenAlex — verified live)
+python3 scripts/search_papers.py "large language model reasoning" --source multi --limit 20 --json
+
+# 2. Download a paper as Markdown (arXiv ID / DOI / S2 ID / PDF URL all accepted)
+python3 scripts/download_paper.py "1706.03762" -o attention.md
+
+# 3. Convert a local PDF to Markdown (with image extraction)
+python3 scripts/pdf2md.py ~/papers/attention.pdf -o attention.md
+
+# In-agent: /liuxiang (defaults to search), /liuxiang paper full, /liuxiang reviewer quick, /liuxiang pipeline
 ```
 
-### Dependencies
+Note: only open-access papers can be downloaded in full text; when full text is unavailable, present the abstracts returned by search instead of fabricating results.
 
-```bash
-pip install requests pdfplumber pymupdf httpx beautifulsoup4 lxml pdfminer.six --break-system-packages -q
-```
+## ✅ Tests & Verification
 
-## Usage Examples
+Verified 2026-09-13 (v0.1.1, matching the git tag):
 
-### Search papers
+- **Syntax**: all 4 Python scripts pass `py_compile`.
+- **Functional**:
+  - `search_papers.py "attention is all you need" --mode title --limit 3` returned 3 real results (Semantic Scholar 429 → automatic fallback to OpenAlex)
+  - `pdf2md.py` converted a locally generated PDF end-to-end, producing frontmatter and body text
+  - `download_paper.py 1706.03762` could not complete in this environment because connections to arXiv were reset; the script's LaTeX→PDF fallback chain and error reporting behaved as designed (the full path works where arXiv is reachable)
+- **Security**: SSRF protection and tar-safe extraction are in place in `download_paper.py` (the fix report records 7/7 test cases passing).
+- liuxiang ships its own CI (`.github/workflows/`: ci.yml / codeql.yml / release.yml).
 
-```bash
-python scripts/search_papers.py "large language model reasoning"
-python scripts/search_papers.py "Attention Is All You Need" --mode title
-python scripts/search_papers.py "transformer architecture" --source multi --limit 10
-```
-
-### Download paper as Markdown
-
-```bash
-python scripts/download_paper.py 2310.06825 -o mistral.md
-python scripts/download_paper.py 10.1145/3025453.3025717 -o paper.md
-```
-
-### Local PDF to Markdown
-
-```bash
-python scripts/pdf2md.py ~/papers/attention.pdf -o attention.md
-```
-
-## Project Structure
+## 📁 Directory Structure
 
 ```
 liuxiang/
-├── SKILL.md              # Skill definition & workflow docs
-├── README.md             # Project overview (Chinese)
-├── README_EN.md          # Project overview (English)
-├── skill.json            # Skill metadata
-├── LICENSE               # MIT License
-├── scripts/
-│   ├── search_papers.py  # Paper search (multi-source aggregation)
-│   ├── download_paper.py # Paper download & Markdown conversion
-│   ├── pdf2md.py         # Local PDF to Markdown
-│   └── html2md.py        # arXiv HTML to Markdown (fallback)
-├── reference/            # paper/reviewer/pipeline module workflow docs
-├── references/           # API notes & reference materials
-├── agents/               # Multi-agent definitions
-├── examples/             # Usage examples
-└── templates/            # Output templates
+├── SKILL.md            # 3.8KB entry: four-module routing + search quick reference
+├── skill.json          # v0.1.1, MIT
+├── scripts/            # search_papers.py / download_paper.py / pdf2md.py / html2md.py
+├── reference/          # Per-module flow docs (search / paper / reviewer / pipeline)
+├── references/         # 58 protocols & standards (citation formats / review criteria / pipeline state machine …)
+├── agents/             # 24 agent definitions (paper 12 + reviewer 7 + orchestrator, etc.)
+├── templates/          # 14 output templates (IMRaD / review report / revision tracking …)
+└── examples/           # 15 examples (full pipeline / revision recovery / literature review …)
 ```
 
-## License
+## 🔮 Boundaries
 
-MIT
+- **search module**: free public APIs, no API key needed; Semantic Scholar uses a shared rate-limit pool and may return 429 under heavy use (the script switches sources automatically).
+- **Does not trigger**: writing or search requests unrelated to academic research; the paper module enters only on explicit paper-writing intent.
+- **Sibling skills**: `cangjie` handles general content transformation and notes; `diting` handles general code quality review; liuxiang's reviewer is academic peer review (multi-perspective scoring + revision roadmap), and pipeline orchestrates only the academic lifecycle.
+- **Known limitations**: see `reference/search.md` § "已知局限"; upstream mechanisms that are missing are all marked "⚠️ 依赖缺失" (see Features).
+
+## 📄 License & Attribution
+
+This suite is MIT licensed (author Kirky-X). The reference docs and agent definitions of the paper / reviewer / pipeline modules derive from the upstream ARS project [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills) (© 2026 Cheng-I Wu, licensed under **CC BY-NC 4.0**, a non-standard-SPDX license); this is stated as-is per the upstream license's current status, and the upstream shared assets (contract files, etc.) are not shipped with this suite.
