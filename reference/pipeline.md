@@ -2,7 +2,7 @@
 
 A lightweight orchestrator that manages the complete academic pipeline from research exploration to final manuscript. It does not perform substantive work — it only detects stages, recommends modes, dispatches skills, manages transitions, and tracks state.
 
-> **Routing discipline (v3.9.2):** see `.claude/CLAUDE.md` "Routing Discipline (v3.9.2)" + `shared/references/intent_clarification_protocol.md` for cross-skill routing rules. This skill assumes routing has already settled — ambiguous cross-phase materials should have been clarified upstream.
+> **Routing discipline:** cross-module routing is handled by the suite entry [`../SKILL.md`](../SKILL.md)（按 `$ARGUMENTS[0]` 路由到 search/paper/reviewer/pipeline 四模块）. This document assumes routing has already settled — ambiguous cross-phase materials should have been clarified upstream.
 
 **v3.6.3 (opt-in):** Set `ARS_PASSPORT_RESET=1` to promote FULL checkpoints to context-reset boundaries. Use `resume_from_passport=<hash>` in a fresh session to continue from the recorded stage. See [`../references/passport_as_reset_boundary.md`](../references/passport_as_reset_boundary.md).
 
@@ -25,7 +25,7 @@ A lightweight orchestrator that manages the complete academic pipeline from rese
 I want to write a research paper on the impact of AI on higher education quality assurance
 ```
 
---> academic-pipeline launches, starting from Stage 1 (RESEARCH)
+--> pipeline 模块启动，从 Stage 1 (RESEARCH) 开始
 
 **Mid-entry (existing paper):**
 
@@ -33,7 +33,7 @@ I want to write a research paper on the impact of AI on higher education quality
 I already have a paper, help me review it
 ```
 
---> academic-pipeline detects mid-entry, starting from Stage 2.5 (INTEGRITY)
+--> pipeline 模块检测到中途进入，从 Stage 2.5 (INTEGRITY) 开始
 
 **Revision mode (received reviewer feedback):**
 
@@ -41,7 +41,7 @@ I already have a paper, help me review it
 I received reviewer comments, help me revise
 ```
 
---> academic-pipeline detects, starting from Stage 4 (REVISE)
+--> pipeline 模块检测到修订需求，从 Stage 4 (REVISE) 开始
 
 **Resume from passport (cross-session context reset, opt-in):**
 
@@ -75,13 +75,13 @@ resume_from_passport=<hash> [stage=<n>] [mode=<m>]
 
 ### Non-Trigger Scenarios
 
-| Scenario                                                | Skill to Use                           |
-| ------------------------------------------------------- | -------------------------------------- |
-| Only need to search materials or do a literature review | `deep-research`                        |
-| Only need to write a paper (no research phase needed)   | `academic-paper`                       |
-| Only need to review a paper                             | `academic-paper-reviewer`              |
-| Only need to check citation format                      | `academic-paper` (citation-check mode) |
-| Only need to convert paper format                       | `academic-paper` (format-convert mode) |
+| Scenario                                                | Module to Use                              |
+| ------------------------------------------------------- | ------------------------------------------ |
+| Only need to search materials or do a literature review | search 模块（[`reference/search.md`](search.md)） |
+| Only need to write a paper (no research phase needed)   | paper 模块（[`reference/paper.md`](paper.md)） |
+| Only need to review a paper                             | reviewer 模块（[`reference/reviewer.md`](reviewer.md)） |
+| Only need to check citation format                      | paper 模块（citation-check mode）           |
+| Only need to convert paper format                       | paper 模块（format-convert mode）           |
 
 ### Trigger Exclusions
 
@@ -95,18 +95,41 @@ resume_from_passport=<hash> [stage=<n>] [mode=<m>]
 
 | Stage   | Name                | Skill / Agent Called               | Available Modes               | Deliverables                                                                                                                           |
 | ------- | ------------------- | ---------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 1       | RESEARCH            | `deep-research`                    | socratic, full, quick         | RQ Brief, Methodology, Bibliography, Synthesis                                                                                         |
-| 2       | WRITE               | `academic-paper`                   | plan, full                    | Paper Draft                                                                                                                            |
+| 1       | RESEARCH            | search 模块（[`reference/search.md`](search.md)）+ `literature_strategist_agent` | `--source auto` / `--source multi` | Literature Corpus（文献清单 + Markdown 全文）、Search Strategy、综合笔记                                       |
+| 2       | WRITE               | paper 模块（[`reference/paper.md`](paper.md)） | plan, full                    | Paper Draft                                                                                                                            |
 | **2.5** | **INTEGRITY**       | **`integrity_verification_agent`** | **pre-review**                | **Integrity verification report + corrected paper**                                                                                    |
-| 3       | REVIEW              | `academic-paper-reviewer`          | full (incl. Devil's Advocate) | 5 review reports + Editorial Decision + Revision Roadmap                                                                               |
-| 4       | REVISE              | `academic-paper`                   | revision                      | Revised Draft, Response to Reviewers                                                                                                   |
-| **3'**  | **RE-REVIEW**       | **`academic-paper-reviewer`**      | **re-review**                 | **Verification review report: revision response checklist + residual issues**                                                          |
-| **4'**  | **RE-REVISE**       | **`academic-paper`**               | **revision**                  | **Second revised draft (if needed)**                                                                                                   |
+| 3       | REVIEW              | reviewer 模块（[`reference/reviewer.md`](reviewer.md)） | full (incl. Devil's Advocate) | 5 review reports + Editorial Decision + Revision Roadmap                                                                               |
+| 4       | REVISE              | paper 模块（revision 模式）         | revision                      | Revised Draft, Response to Reviewers                                                                                                   |
+| **3'**  | **RE-REVIEW**       | **reviewer 模块（re-review 模式）** | **re-review**                 | **Verification review report: revision response checklist + residual issues**                                                          |
+| **4'**  | **RE-REVISE**       | **paper 模块（revision 模式）**     | **revision**                  | **Second revised draft (if needed)**                                                                                                   |
 | **4.5** | **FINAL INTEGRITY** | **`integrity_verification_agent`** | **final-check**               | **Final verification report (must achieve 100% pass to proceed)**                                                                      |
-| 5       | FINALIZE            | `academic-paper`                   | format-convert                | Final Paper (default MD; DOCX via Pandoc when available, otherwise conversion instructions; ask about LaTeX; confirm correctness; PDF) |
+| 5       | FINALIZE            | paper 模块（format-convert 模式）   | format-convert                | Final Paper (default MD; DOCX via Pandoc when available, otherwise conversion instructions; ask about LaTeX; confirm correctness; PDF) |
 | **6**   | **PROCESS SUMMARY** | **orchestrator**                   | **auto**                      | **Paper creation process record MD + LaTeX to PDF (bilingual)**                                                                        |
 
-**Parallelization opportunity (v3.3)**: Within Stage 2, the `academic-paper` skill's Phase 1 (literature_strategist_agent) and the `visualization_agent` can operate in parallel after Phase 2 (structure_architect_agent) completes the outline. Specifically:
+### Stage 1 Output Convention（search → paper 交接格式）
+
+Stage 1 不派发外部研究技能，而是调用本套件的 search 模块（见 [`../SKILL.md`](../SKILL.md) 与 [`reference/search.md`](search.md)）：
+
+```bash
+python3 scripts/search_papers.py "<research question 关键词>" --source multi --limit 20 --json
+python3 scripts/download_paper.py "<arXiv ID 或 DOI>" -o papers/<slug>.md
+```
+
+产出的 Markdown 全文列表作为 `literature_strategist_agent`（`../agents/literature_strategist_agent.md`）的输入语料。最小交接格式：**一个文献清单文件 + 每篇的标题/来源/路径**：
+
+```markdown
+# Literature Corpus — <主题>（<日期>）
+
+| # | 标题 | 来源 | 标识符 | 本地路径 |
+|---|------|------|--------|----------|
+| 1 | …    | arXiv | 2306.12345 | ./papers/….md |
+| 2 | …    | OpenAlex | DOI:10.xxxx/… | （仅摘要） |
+```
+
+- 已下载全文的条目必须给 `本地路径`（指向 `download_paper.py` 产出的 `.md`）；只拿到摘要的条目路径留空并注明「仅摘要」。
+- 该清单是 Stage 1 → Stage 2 的正式交接产物，Stage 2 intake 依据它跳过重复检索（见 [`paper.md`](paper.md) § "Handoff Protocol"）。
+
+**Parallelization opportunity (v3.3)**: Within Stage 2, the paper 模块's Phase 1 (literature_strategist_agent) and the `visualization_agent` can operate in parallel after Phase 2 (structure_architect_agent) completes the outline. Specifically:
 
 - Once the outline includes a visualization plan, `visualization_agent` can begin figure generation
 - Simultaneously, `argument_builder_agent` can build CER chains
@@ -207,7 +230,7 @@ If ANY answer raises concern, include it in the checkpoint presentation to the u
 | 1   | `pipeline_orchestrator_agent`     | Main orchestrator: detects stage, recommends mode, triggers skill, manages transitions                                                                                                                                                                                                                                          | `../agents/pipeline_orchestrator_agent.md`     |
 | 2   | `state_tracker_agent`             | State tracker: records completed stages, produced materials, revision loop count                                                                                                                                                                                                                                                | `../agents/state_tracker_agent.md`             |
 | 3   | `integrity_verification_agent`    | Integrity verifier: 100% reference/citation/data verification (blocking)                                                                                                                                                                                                                                                        | `../agents/integrity_verification_agent.md`    |
-| 4   | `collaboration_depth_agent`       | **Observer (advisory only — never blocks).** Reads dialogue log and scores user-AI collaboration pattern against `shared/collaboration_depth_rubric.md`. Invoked at FULL/SLIM checkpoints and at pipeline completion. Based on Wang & Zhang (2026).                                                                             | `../agents/collaboration_depth_agent.md`       |
+| 4   | `collaboration_depth_agent`       | **Observer (advisory only — never blocks).** Reads dialogue log and scores user-AI collaboration pattern against the canonical rubric inlined in `../agents/collaboration_depth_agent.md` § "Canonical Rubric". Invoked at FULL/SLIM checkpoints and at pipeline completion. Based on Wang & Zhang (2026).                                                                             | `../agents/collaboration_depth_agent.md`       |
 | 5   | `claim_ref_alignment_audit_agent` | **Opt-in claim faithfulness auditor (v3.8 #103).** Audits sampled citations for claim ↔ reference alignment + negative-constraint compliance; emits per-claim `claim_audit_results[]`, `claim_drift[]`, `uncited_assertions[]`, `constraint_violations[]`. Dispatched via orchestrator §3.6 when claim_audit mode is requested. | `../agents/claim_ref_alignment_audit_agent.md` |
 
 ---
@@ -241,9 +264,9 @@ pipeline_orchestrator_agent analyzes the user's input:
 Based on entry point and user preferences, recommend modes for each stage:
 
 User type determination:
-- Novice / wants guidance --> socratic (Stage 1) + plan (Stage 2) + guided (Stage 3)
-- Experienced / wants direct output --> full (Stage 1) + full (Stage 2) + full (Stage 3)
-- Time-limited --> quick (Stage 1) + full (Stage 2) + quick (Stage 3)
+- Novice / wants guidance --> Stage 1 search（`--source multi`，逐条讲解结果）+ plan (Stage 2) + guided (Stage 3)
+- Experienced / wants direct output --> Stage 1 search（`--source multi` 批量检索）+ full (Stage 2) + full (Stage 3)
+- Time-limited --> Stage 1 search（`--source auto --limit 10`）+ full (Stage 2) + quick (Stage 3)
 
 Explain the differences between modes when recommending, letting the user choose
 ```
@@ -271,12 +294,12 @@ After user confirmation:
 
 1. Pass the previous stage's deliverables as input to the next stage
 2. Trigger handoff protocol (defined in each skill's SKILL.md):
-   - Stage 1  --> 2: deep-research handoff (RQ Brief + Bibliography + Synthesis)
+   - Stage 1  --> 2: search 模块 handoff（Literature Corpus 文献清单 + Markdown 全文，见上方 Stage 1 Output Convention）
    - Stage 2  --> 2.5: Pass complete paper to integrity_verification_agent
    - Stage 2.5 --> 3: Pass verified paper to reviewer
-   - Stage 3  --> 4: Pass Revision Roadmap to academic-paper revision mode
+   - Stage 3  --> 4: Pass Revision Roadmap to paper 模块 revision mode
    - Stage 4  --> 3': Pass revised draft and Response to Reviewers to reviewer
-   - Stage 3' --> 4': Pass new Revision Roadmap + R&R Traceability Matrix (Schema 11) to academic-paper revision mode
+   - Stage 3' --> 4': Pass new Revision Roadmap + R&R Traceability Matrix (Schema 11) to paper 模块 revision mode
    - Stage 4/4' --> 4.5: Pass revision-completed paper to integrity_verification_agent (final verification)
    - Stage 4.5 --> 5: Pass verified final draft to format-convert mode
 3. Begin next stage
@@ -306,13 +329,13 @@ Checkpoint: [MANDATORY/ADVISORY] — [What user needs to confirm]
 
 ## Phase-by-phase Invocation Contract (v3.9.2)
 
-academic-pipeline is the orchestrator skill that coordinates the full ARS pipeline across 10 stages (delegating to deep-research, academic-paper, academic-paper-reviewer). Two invocation modes:
+The pipeline module is the orchestrator that coordinates the full research workflow across 10 stages (delegating to the suite's search / paper / reviewer modules, see [`../SKILL.md`](../SKILL.md)). Two invocation modes:
 
 **Mode A — orchestrator-driven (default):** `pipeline_orchestrator_agent` runs all stages end-to-end with state tracking via Material Passport. `state_tracker_agent`, `integrity_verification_agent`, `collaboration_depth_agent`, and `claim_ref_alignment_audit_agent` are dispatched by the orchestrator at the appropriate checkpoints.
 
 **Mode B — phase-by-phase (cross-session resume):** User invokes one phase agent at a time across sessions, typically via `ARS_PASSPORT_RESET=1` + `resume_from_passport=<hash>` (see `../references/passport_as_reset_boundary.md`).
 
-In Mode B, **single-phase agents (Bucket A per `docs/design/2026-05-18-ars-v3.9.2-agent-phase-classification.md`) in the downstream skills (deep-research, academic-paper, academic-paper-reviewer) stay strictly within their assigned phase for writes**. The 5 agents in academic-pipeline itself are all cross-phase / meta by design (Bucket C/D) — they have no fence by design:
+In Mode B, **single-phase agents (Bucket A) in the downstream modules (search / paper / reviewer) stay strictly within their assigned phase for writes**. The 5 agents in the pipeline module itself are all cross-phase / meta by design (Bucket C/D) — they have no fence by design:
 
 - `pipeline_orchestrator_agent` (D — orchestrator, full pipeline visibility)
 - `state_tracker_agent` (D — meta state, all phases)
@@ -320,9 +343,9 @@ In Mode B, **single-phase agents (Bucket A per `docs/design/2026-05-18-ars-v3.9.
 - `collaboration_depth_agent` (C — FULL/SLIM checkpoints + pipeline completion, advisory-only)
 - `claim_ref_alignment_audit_agent` (C — opt-in claim audit, phase-orthogonal)
 
-Routing into Mode B requires explicit user signal — `/ars-<mode>` slash command or `[direct-mode]` prefix. Ambiguous cross-phase input defaults to clarification per `.claude/CLAUDE.md` Routing Discipline + `shared/references/intent_clarification_protocol.md`. **Critically:** if `pipeline_orchestrator_agent` is dispatched on ambiguous cross-phase materials, the orchestrator itself currently cannot reconcile (this is the v3.10 conductor #134 work) — v3.9.2 routes such cases to clarification BEFORE the orchestrator runs.
+Routing into Mode B requires an explicit user signal — a `[direct-mode]` prefix or an explicit per-module `$ARGUMENTS` selection（见 [`../SKILL.md`](../SKILL.md) 模块路由）. Ambiguous cross-phase input defaults to clarification by the orchestrator BEFORE any stage runs. **Critically:** if `pipeline_orchestrator_agent` is dispatched on ambiguous cross-phase materials, the orchestrator itself currently cannot reconcile — v3.9.2 routes such cases to clarification BEFORE the orchestrator runs.
 
-**Enforcement (v3.9.2):** prompt-level via Phase Boundary blocks on downstream Bucket A agents + advisory verifier (`scripts/check_pipeline_integrity.py`). Deterministic PreToolUse hook + multi-phase envelope + orchestrator structured intake deferred to v3.10 active conductor (#134).
+**Enforcement:** prompt-level via Phase Boundary blocks on downstream Bucket A agents. ⚠️ 依赖缺失，当前版本未实现：上游 ARS 的 advisory verifier（`scripts/check_pipeline_integrity.py`）、deterministic PreToolUse hook、multi-phase envelope、orchestrator structured intake 均未随本套件发布（原 v3.10 active conductor #134 计划项）。
 
 ---
 
@@ -337,7 +360,7 @@ Stage 2.5 (pre-review) and Stage 4.5 (post-revision) verification. 5-phase proto
 > See `../references/integrity_review_protocol.md` for the 5-phase citation/claim verification procedures.
 > See `../references/ai_research_failure_modes.md` for the 7-mode AI research failure checklist and block/override logic.
 
-- [v3.4.0] `compliance_agent` runs mode-aware PRISMA-trAIce + RAISE compliance check; tier-based block semantics. See `shared/compliance_checkpoint_protocol.md`.
+- [v3.4.0] `compliance_agent`（mode-aware PRISMA-trAIce + RAISE 合规检查）。⚠️ 依赖缺失，当前版本未实现：`compliance_agent` 与 `shared/compliance_checkpoint_protocol.md` 均未随本套件发布；诚信检查当前仅按 `../references/integrity_review_protocol.md` 的 5 阶段协议执行。
 
 ---
 
@@ -385,7 +408,7 @@ ASCII dashboard shown at FULL checkpoints to display pipeline progress.
 
 - Stage 3 (first review) -> Stage 4 (revision) -> Stage 3' (verification review) -> Stage 4' (re-revision, if needed) -> Stage 4.5 (final verification)
 - **Maximum 1 round of RE-REVISE** (Stage 4'): If Stage 3' gives Major, enter Stage 4' for revision then proceed directly to Stage 4.5 (no return to review)
-- **Pipeline overrides academic-paper's max 2 revision rule**: In the pipeline, revisions are limited to Stage 4 + Stage 4' (one round each), replacing academic-paper's max 2 rounds rule
+- **Pipeline overrides paper 模块's max 2 revision rule**: In the pipeline, revisions are limited to Stage 4 + Stage 4' (one round each), replacing paper 模块's max 2 rounds rule
 - Mark unresolved issues as Acknowledged Limitations
 - Provide cumulative revision history (each round's decision, items addressed, unresolved items)
 
@@ -421,7 +444,7 @@ The `collaboration_depth_agent` observes the user's collaboration pattern with t
 
 **When invoked**: every FULL checkpoint, every SLIM checkpoint, and after Stage 6 (pipeline completion). MANDATORY checkpoints (Stages 2.5 / 4.5 integrity gates) **do not** invoke the observer — those are integrity concerns and must not be diluted.
 
-**What it does**: reads the dialogue range for the just-completed stage (at checkpoints) or the whole pipeline (at completion), scores the pattern against the canonical rubric at `shared/collaboration_depth_rubric.md`, and emits an advisory block/chapter. Dimensions: Delegation Intensity, Cognitive Vigilance, Cognitive Reallocation, Zone Classification (Zone 1 / Zone 2 / Zone 3). Rubric is based on Wang & Zhang (2026) IJETHE 23:11 (DOI 10.1186/s41239-026-00585-x).
+**What it does**: reads the dialogue range for the just-completed stage (at checkpoints) or the whole pipeline (at completion), scores the pattern against the canonical rubric inlined in `../agents/collaboration_depth_agent.md` § "Canonical Rubric", and emits an advisory block/chapter. Dimensions: Delegation Intensity, Cognitive Vigilance, Cognitive Reallocation, Zone Classification (Zone 1 / Zone 2 / Zone 3). Rubric is based on Wang & Zhang (2026) IJETHE 23:11 (DOI 10.1186/s41239-026-00585-x).
 
 **Distinction from existing mechanisms**:
 
@@ -440,7 +463,7 @@ The `collaboration_depth_agent` observes the user's collaboration pattern with t
 
 **Cross-model**: when `ARS_CROSS_MODEL` is set, the observer runs on both models and flags any dimension divergence > 2 points. Scores are never silently averaged across models.
 
-> See `../agents/collaboration_depth_agent.md` for full scoring procedure and anti-sycophancy discipline; `shared/collaboration_depth_rubric.md` for the canonical 4-dimension rubric.
+> See `../agents/collaboration_depth_agent.md` for the full scoring procedure, anti-sycophancy discipline, and the canonical 4-dimension rubric (inlined in that file § "Canonical Rubric").
 
 ---
 
@@ -485,7 +508,7 @@ Explicit prohibitions to prevent common failure modes:
 | Stage     | Error                                | Handling                                                                                                  |
 | --------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | Intake    | Cannot determine entry point         | Ask user what materials they have and their goal                                                          |
-| Stage 1   | deep-research not converging         | Suggest mode switch (socratic -> full) or narrow scope                                                    |
+| Stage 1   | search 检索不收敛 / 文献不足           | 收窄检索词、切换 `--source multi`、提高 `--limit`（见 [`reference/search.md`](search.md)）；仍不足则与用户确认缩小研究范围                                   |
 | Stage 2   | Missing research foundation          | Suggest returning to Stage 1 to supplement research                                                       |
 | Stage 2.5 | Still FAIL after 3 correction rounds | List unverifiable items; user decides whether to continue                                                 |
 | Stage 3   | Review result is Reject              | Provide options: major restructuring (Stage 2) or abandon                                                 |
@@ -518,7 +541,7 @@ Explicit prohibitions to prevent common failure modes:
 | `../references/plagiarism_detection_protocol.md`    | Phase D originality verification protocol + self-plagiarism + AI text characteristics                                                                                                                                                          |
 | `../references/mode_advisor.md`                     | Unified cross-skill decision tree: maps user intent to optimal skill + mode                                                                                                                                                                    |
 | `../references/claim_verification_protocol.md`      | Phase E claim verification protocol: claim extraction, source tracing, cross-referencing, verdict taxonomy                                                                                                                                     |
-| `../references/claim_audit_calibration_protocol.md` | v3.8 #103 claim_ref_alignment audit calibration: gold-set shape (T-C3), threshold gates FNR<0.15 / FPR<0.10 (T-C1), per-class FNR/FPR reporting (T-C2). Re-run via `PYTHONPATH=. python3 -m unittest scripts.test_claim_audit_calibration -v`. |
+| `../references/claim_audit_calibration_protocol.md` | v3.8 #103 claim_ref_alignment audit calibration: gold-set shape (T-C3), threshold gates FNR<0.15 / FPR<0.10 (T-C1), per-class FNR/FPR reporting (T-C2). ⚠️ 依赖缺失，当前版本未实现：配套测试 `scripts/test_claim_audit_calibration.py` 未随本套件发布。 |
 | `../references/ai_research_failure_modes.md`        | 7-mode AI research failure checklist (Lu 2026), run at Stage 2.5 + 4.5 with blocking behaviour, reported at Stage 6                                                                                                                            |
 | `../references/team_collaboration_protocol.md`      | Multi-person team coordination: role definitions, handoff protocol, version control, conflict resolution                                                                                                                                       |
 | `../references/integrity_review_protocol.md`        | Stage 2.5 + 4.5 integrity verification: 5-phase protocol details                                                                                                                                                                               |
@@ -529,8 +552,8 @@ Explicit prohibitions to prevent common failure modes:
 | `../references/progress_dashboard_template.md`      | ASCII progress dashboard template                                                                                                                                                                                                              |
 | `../references/reinforcement_content.md`            | Stage-specific reinforcement focus table for transitions                                                                                                                                                                                       |
 | `../references/changelog-pipeline.md`                        | Full version history                                                                                                                                                                                                                           |
-| `shared/handoff_schemas.md`                      | Cross-skill data contracts: 9 schemas for all inter-stage handoff artifacts                                                                                                                                                                    |
-| `shared/collaboration_depth_rubric.md`           | Collaboration Depth Observer rubric (v1.0): 4 dimensions based on Wang & Zhang (2026) IJETHE 23:11                                                                                                                                             |
+| Stage 1 Output Convention（本文件 § "Stage 1 Output Convention"） | search 模块 → paper 模块的最小交接格式：文献清单 + 每篇标题/来源/本地路径                                                                                                                       |
+| `../agents/collaboration_depth_agent.md` § "Canonical Rubric" | Collaboration Depth Observer rubric (v1.0，已内联于该 agent 文件): 4 dimensions based on Wang & Zhang (2026) IJETHE 23:11                                                                                                                      |
 
 ---
 
@@ -557,31 +580,31 @@ Follows user language. Academic terminology retained in English.
 
 ---
 
-## Integration with Other Skills
+## Integration with Other Modules
 
 ```
-academic-pipeline dispatches the following skills (does not do work itself):
+The pipeline module dispatches the following suite modules (does not do work itself):
 
-Stage 1: deep-research
-  - socratic mode: Guided research exploration
-  - full mode: Complete research report
-  - quick mode: Quick research summary
+Stage 1: search 模块（scripts/search_papers.py + scripts/download_paper.py）
+  - --source auto: 单源快速检索（S2 → OpenAlex → arXiv 自动降级）
+  - --source multi: 多平台聚合检索，产物为 Literature Corpus 清单 + Markdown 全文
+  - 交接: Literature Corpus 作为 literature_strategist_agent 的输入语料
 
-Stage 2: academic-paper
+Stage 2: paper 模块（reference/paper.md）
   - plan mode: Socratic chapter-by-chapter guidance
   - full mode: Complete paper writing
 
 Stage 2.5: integrity_verification_agent (Mode 1: pre-review)
 Stage 4.5: integrity_verification_agent (Mode 2: final-check)
 
-Stage 3: academic-paper-reviewer
+Stage 3: reviewer 模块（reference/reviewer.md）
   - full mode: Complete 5-person review (EIC + R1/R2/R3 + Devil's Advocate)
 
-Stage 3': academic-paper-reviewer
+Stage 3': reviewer 模块
   - re-review mode: Verification review (focused on revision responses)
 
-Stage 4/4': academic-paper (revision mode)
-Stage 5: academic-paper (format-convert mode)
+Stage 4/4': paper 模块 (revision mode)
+Stage 5: paper 模块 (format-convert mode)
   - Step 1: Ask user which academic formatting style (APA 7.0 / Chicago / IEEE, etc.)
   - Step 2: Produce MD, then generate DOCX via Pandoc when available (otherwise provide conversion instructions)
   - Step 3: Produce LaTeX (using corresponding document class, e.g., apa7 class for APA 7.0)
@@ -592,13 +615,13 @@ Stage 5: academic-paper (format-convert mode)
 
 ---
 
-## Related Skills
+## Related Modules
 
-| Skill                     | Relationship                                                          |
+| Module                    | Relationship                                                          |
 | ------------------------- | --------------------------------------------------------------------- |
-| `deep-research`           | Dispatched (Stage 1 research phase)                                   |
-| `academic-paper`          | Dispatched (Stage 2 writing, Stage 4/4' revision, Stage 5 formatting) |
-| `academic-paper-reviewer` | Dispatched (Stage 3 first review, Stage 3' verification review)       |
+| search（`reference/search.md`） | Dispatched (Stage 1 research phase)                                   |
+| paper（`reference/paper.md`）   | Dispatched (Stage 2 writing, Stage 4/4' revision, Stage 5 formatting) |
+| reviewer（`reference/reviewer.md`） | Dispatched (Stage 3 first review, Stage 3' verification review)       |
 
 ---
 
@@ -608,8 +631,9 @@ Stage 5: academic-paper (format-convert mode)
 | ---------------- | ------------------------------------------------------------------------ |
 | Skill Version    | 3.11.0                                                                   |
 | Last Updated     | 2026-06-01                                                               |
+| 版本注记         | 本套件（liuxiang）四个模块统一版本 **3.11.0**；正文中保留的 `v3.2`–`v3.9.2` 等小版本号为沿用上游 ARS 文档的机制历史标注，不再作为套件版本 |
 | Maintainer       | Cheng-I Wu                                                               |
-| Dependent Skills | deep-research v2.0+, academic-paper v2.0+, academic-paper-reviewer v1.1+ |
+| Dependent Modules | 本套件 search / paper / reviewer 模块（均随套件发布，无外部技能依赖） |
 | Role             | Full academic research workflow orchestrator                             |
 
 ---

@@ -19,7 +19,9 @@ Translation for ARS: **our reviewer has an error profile too, and we do not curr
 
 ## Inputs
 
-1. **Gold-standard set**: 5-20 papers the user has labelled with known outcomes. Minimum 5; recommended 10-15. Each entry:
+0. **⚠️ 规则6 — 硬预算上限（不可自动绕过）**：calibration 金标论文 **≤3 篇**、每篇评审 **≤2 次**（`full` 调用合计 ≤6 次）。超出该上限（更多金标论文、更多重复次数、或按本文件早期版本对 5-20 篇 × 5 次跑满 ensembling）**必须先获得用户显式批准**并把批准语记入 Calibration Report；agent 与 orchestrator 不得自行扩大预算。以下各节中更大的规模（如 5-20 篇、每篇 5 次）仅在用户显式批准后作为上限使用。
+
+1. **Gold-standard set**: 用户提供的已知结果金标论文。默认 ≤3 篇（规则6）；用户显式批准后最多 5-20 篇，recommended 10-15。Each entry:
    - Paper file path or text
    - Ground-truth label: `accept`, `reject`, or `borderline`
    - Venue context (journal/conference, tier)
@@ -41,12 +43,12 @@ Translation for ARS: **our reviewer has an error profile too, and we do not curr
 
 ### Phase 1: Run `full` mode on each gold paper, with ensembling
 
-For each paper, run the standard `full` review pipeline **5 times** (ensembling, per Lu 2026 Methods A.1.1). Each run uses a fresh context window to avoid within-session bias. Aggregate:
+For each paper, run the standard `full` review pipeline **≤2 times**（规则6 默认上限；用户显式批准后最多 5 次，ensembling per Lu 2026 Methods A.1.1）. Each run uses a fresh context window to avoid within-session bias. Aggregate:
 - Median rubric score per dimension
-- Variance across the 5 runs (reported as a stability indicator)
-- Editorial decision (majority vote across 5)
+- Variance across the runs (reported as a stability indicator)
+- Editorial decision (majority vote across runs)
 
-**Cross-model verification**: In calibration mode, `ARS_CROSS_MODEL` is **default-on** rather than opt-in. At least one of the 5 runs should use a different model family if available, to avoid single-model blind spots. If no cross-model is configured, emit a warning and run all 5 on the primary model.
+**Cross-model verification**: In calibration mode, `ARS_CROSS_MODEL` is **default-on** rather than opt-in. At least one of the runs should use a different model family if available, to avoid single-model blind spots. If no cross-model is configured, emit a warning and run all runs on the primary model.
 
 ### Phase 2: Build the confusion matrix
 
@@ -138,7 +140,7 @@ Lu 2026 Methods A.1.1 describes reviewer ensembling across 5 independent runs wi
 1. **Median instead of mean for rubric scores**: mean is vulnerable to single-run outliers (e.g., a run that hallucinates a methodological flaw); median is robust.
 2. **Fresh context per run**: Lu 2026 allowed within-session memory across runs. ARS uses fresh context to prevent cascading errors from a single run's misreading.
 
-Users with token budget concerns can reduce `runs_per_paper` to 3. Below 3, ensembling is meaningless — do not allow 1 or 2.
+Token budget: default `runs_per_paper` ≤ 2（规则6 硬上限，超出需用户显式批准）。单篇 1 次时不构成 ensembling，报告须注明 stability 不可估。
 
 ---
 
@@ -159,7 +161,7 @@ If the user's gold set is itself biased (e.g., all papers from one lab, all from
 
 | Existing mode | Interaction with calibration |
 |---|---|
-| `full` | Calibration runs `full` 5x per gold paper. No change to `full` itself. |
+| `full` | Calibration runs `full` ≤2x per gold paper（规则6；用户显式批准后最多 5x）. No change to `full` itself. |
 | `re-review` | Calibration profile attaches to re-review decisions. |
 | `quick` | Calibration profile attaches. Confidence disclosure notes that `quick` has additional uncalibrated error on top of the measured profile. |
 | `methodology-focus` | Calibration should ideally be run with methodology-heavy gold papers if this mode is the user's target. |

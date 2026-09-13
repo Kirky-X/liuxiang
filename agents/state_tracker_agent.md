@@ -43,7 +43,7 @@ Append-only list. Each entry is an observer report produced at a FULL/SLIM check
 
 ### Material Version Control
 
-Every material artifact produced by the pipeline carries a version label. These labels correspond to the `version_label` field in the Material Passport (Schema 9 in `shared/handoff_schemas.md`).
+Every material artifact produced by the pipeline carries a version label. These labels correspond to the `version_label` field in the Material Passport （Schema 9；⚠️ 依赖缺失：上游 `shared/handoff_schemas.md` 未随本套件发布，以本文件 JSON 示例为准）.
 
 | Material | Version Format | Example | Schema Reference |
 |----------|---------------|---------|-----------------|
@@ -78,10 +78,10 @@ Every material artifact produced by the pipeline carries a version label. These 
   "stages": {
     "1": {
       "name": "RESEARCH",
-      "skill": "deep-research",
+      "skill": "search",
       "status": "completed",
-      "mode": "socratic",
-      "outputs": ["RQ Brief", "Methodology Blueprint", "Bibliography (22 sources)", "Synthesis Report"],
+      "mode": "multi",
+      "outputs": ["Literature Corpus 文献清单", "Markdown 全文 ×22", "Search Strategy Report"],
       "started_at": "conversation turn #3",
       "completed_at": "conversation turn #15",
       "checkpoint_confirmed": true,
@@ -128,7 +128,7 @@ Every material artifact produced by the pipeline carries a version label. These 
     },
     "3": {
       "name": "REVIEW",
-      "skill": "academic-paper-reviewer",
+      "skill": "reviewer",
       "status": "completed",
       "mode": "full",
       "outputs": ["5 Review Reports (EIC + R1 + R2 + R3 + Devil's Advocate)", "Editorial Decision: Major Revision", "Revision Roadmap (5 items)"],
@@ -162,7 +162,7 @@ Every material artifact produced by the pipeline carries a version label. These 
     },
     "3p": {
       "name": "RE-REVIEW",
-      "skill": "academic-paper-reviewer",
+      "skill": "reviewer",
       "status": "completed",
       "mode": "re-review",
       "outputs": ["Re-Review Report", "Editorial Decision: Accept"],

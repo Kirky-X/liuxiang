@@ -36,14 +36,17 @@ OA PDF 解析链：Semantic Scholar openAccessPdf → Unpaywall（DOI 反查 OA 
 import argparse
 import hashlib
 import io
+import ipaddress
 import os
 import re
 import shutil
+import socket
 import sys
 import tarfile
 import tempfile
 import time
 import xml.etree.ElementTree as ET  # nosec B405 - 仅用于 findall/findtext，解析已改用 defusedxml
+from urllib.parse import urlparse
 
 import defusedxml.ElementTree as defused_ET
 import requests
@@ -91,6 +94,97 @@ def _get_with_retry(url: str, params: dict | None = None, timeout: int = 15):
                 time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
                 continue
     raise last_exc
+
+
+# ---------------------------------------------------------------------------
+# SSRF 防护：仅允许 http(s)，且主机解析后的 IP 不得指向本机/内网/链路本地等地址。
+# 适用于用户直接提供的 URL，以及 S2/Unpaywall 远程返回的 OA PDF 链接（同样不可信）。
+# ---------------------------------------------------------------------------
+
+ALLOWED_URL_SCHEMES = ("http", "https")
+
+
+def _ip_reject_reason(ip: "ipaddress.IPv4Address | ipaddress.IPv6Address") -> str | None:
+    """返回拒绝该 IP 的原因；公网单播地址返回 None。"""
+    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+        return f"本机/保留/链路本地地址（{ip}）"
+    # is_private 覆盖 RFC1918 私网、CGNAT、IPv6 unique-local 等
+    if ip.is_private:
+        return f"内网私有地址（{ip}）"
+    return None
+
+
+def validate_public_http_url(url: str) -> None:
+    """校验 URL 可安全 GET：scheme 白名单 + 主机非本机/内网/链路本地地址。
+
+    解析 DNS 后对**所有**解析结果逐一检查，任一命中即拒绝。
+    不通过时抛 RuntimeError（由调用方转为用户可读错误）。
+    简化说明：不做 DNS-rebinding TOCTOU 防护（校验后重新解析的攻击面，本脚本不涉及凭据）。
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ALLOWED_URL_SCHEMES:
+        raise RuntimeError(f"不支持的 URL scheme：{parsed.scheme!r}（仅允许 http/https）。")
+    host = parsed.hostname
+    if not host:
+        raise RuntimeError("URL 缺少主机名，拒绝下载。")
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+        raise RuntimeError(f"拒绝指向本地/内部主机的 URL：{host}")
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    try:
+        infos = socket.getaddrinfo(host, port or (443 if parsed.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except OSError as e:
+        raise RuntimeError(f"URL 主机解析失败：{host}（{e}）。") from e
+    if not infos:
+        raise RuntimeError(f"URL 主机无可用解析结果：{host}。")
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            raise RuntimeError(f"URL 主机解析到无法识别的地址（{info[4][0]}），拒绝下载。")
+        reason = _ip_reject_reason(ip)
+        if reason:
+            raise RuntimeError(f"拒绝下载：{host} 解析到{reason}，疑似内网/SSRF 目标。")
+
+
+def _extract_tar_safely(tar: tarfile.TarFile, dest_dir: str) -> None:
+    """安全解压 tar 包：拒绝绝对路径、路径穿越（..）、symlink/hardlink 与非普通文件成员。
+
+    优先用解释器原生 data 过滤器（Python 3.12+；3.8.17+/3.9.17+/3.10.12+/3.11.4+ 安全回补版
+    同样支持 filter 参数），它会拒绝上述危险成员；旧版本无 filter 参数时逐成员手动校验。
+    注意：LaTeX 源码包不需要链接文件，symlink/hardlink 一律拒绝（防链接逃逸）。
+    """
+    members = tar.getmembers()
+    try:
+        tar.extractall(dest_dir, filter="data")  # nosec B202 - data 过滤器已拒绝危险成员
+        return
+    except TypeError:
+        # 旧版本 Python：extractall 不接受 filter 参数，走下方逐成员校验
+        pass
+    except tarfile.TarError:
+        # data 过滤器拒绝了个别危险成员（可能已部分解压）；继续走逐成员校验提取安全子集
+        pass
+
+    dest_real = os.path.realpath(dest_dir)
+    for member in members:
+        name = member.name
+        if name.startswith("/") or ".." in name.split("/"):
+            continue  # 绝对路径 / 路径穿越
+        if member.issym() or member.islnk():
+            continue  # symlink / hardlink 一律拒绝
+        if not (member.isfile() or member.isdir()):
+            continue  # 设备/管道等其他类型一律拒绝
+        # 双保险：确认最终落点仍在目标目录内
+        target_real = os.path.realpath(os.path.join(dest_dir, name))
+        if target_real != dest_real and not target_real.startswith(dest_real + os.sep):
+            continue
+        try:
+            tar.extract(member, dest_dir)  # nosec B202 - 成员已经上述校验
+        except (tarfile.TarError, OSError):
+            continue
 
 
 def slugify(title: str) -> str:
@@ -203,6 +297,8 @@ def resolve_metadata(identifier: str):
 
     # 情况一：直接给的 URL——无法推断 arXiv 版本，只能走 PDF。
     if identifier.startswith(("http://", "https://")):
+        # SSRF 防护：scheme 白名单 + 拒绝本机/内网/链路本地目标（含 DNS 解析后校验）
+        validate_public_http_url(identifier)
         meta = {"title": None, "authors": [], "published": None, "abstract": None, "venue": None}
         return meta, identifier, None
 
@@ -251,6 +347,8 @@ def resolve_metadata(identifier: str):
 
 
 def download_pdf(pdf_url: str) -> str:
+    # SSRF 防护同样适用于远程元数据接口（S2 openAccessPdf / Unpaywall）返回的链接
+    validate_public_http_url(pdf_url)
     resp = _get_with_retry(pdf_url, timeout=60)
     resp.raise_for_status()
     if not resp.content.startswith(b"%PDF"):
@@ -530,14 +628,8 @@ def latex_source_to_markdown(arxiv_id: str, images_dir: str | None = None) -> st
                 print("[提示] 源码包格式无法识别，降级到 PDF。", file=sys.stderr)
                 return None
         if tar:
-            # 过滤掉不安全的路径（防止路径穿越）
-            for member in tar.getmembers():
-                if member.name.startswith("/") or ".." in member.name.split("/"):
-                    continue
-                try:
-                    tar.extract(member, tmp_dir)
-                except (tarfile.TarError, OSError):
-                    pass
+            # 安全解压：拒绝绝对路径/..、symlink/hardlink 与设备文件（见 _extract_tar_safely）
+            _extract_tar_safely(tar, tmp_dir)
             tar.close()
 
         # 收集 tarball 中所有图片文件的路径（相对于 tmp_dir），

@@ -1,4 +1,4 @@
-# Academic Paper Reviewer v1.10.0 — Multi-Perspective Academic Paper Review Agent Team
+# Academic Paper Reviewer v3.11.0 — Multi-Perspective Academic Paper Review Agent Team
 
 Simulates a complete international journal peer review process: automatically identifies the paper's field, dynamically configures 5 reviewers (Editor-in-Chief + 3 peer reviewers + Devil's Advocate) who review from four non-overlapping perspectives — methodology, domain expertise, cross-disciplinary viewpoints, and core argument challenges — ultimately producing a structured Editorial Decision and Revision Roadmap.
 
@@ -8,7 +8,7 @@ Simulates a complete international journal peer review process: automatically id
 2. Added `re-review` mode — verification review, focused on checking whether revisions address the review comments
 3. Expanded review team from 4 to 5 members
 
-> **Routing discipline (v3.9.2):** see `.claude/CLAUDE.md` "Routing Discipline (v3.9.2)" + `shared/references/intent_clarification_protocol.md` for cross-skill routing rules. This skill assumes routing has already settled — ambiguous cross-phase materials should have been clarified upstream.
+> **Routing discipline:** cross-module routing is handled by the suite entry [`../SKILL.md`](../SKILL.md)（按 `$ARGUMENTS[0]` 路由到 search/paper/reviewer/pipeline 四模块）. This document assumes routing has already settled — ambiguous cross-phase materials should have been clarified upstream.
 
 ---
 
@@ -37,11 +37,11 @@ Review this paper: [paste paper or provide file]
 
 ### Non-Trigger Scenarios
 
-| Scenario                                              | Skill to Use                     |
+| Scenario                                              | Module to Use                     |
 | ----------------------------------------------------- | -------------------------------- |
-| Need to write a paper (not review)                    | `academic-paper`                 |
-| Need in-depth investigation of a research topic       | `deep-research`                  |
-| Need to revise a paper (already have review comments) | `academic-paper` (revision mode) |
+| Need to write a paper (not review)                    | paper 模块（[`reference/paper.md`](paper.md)）                 |
+| Need to search / download papers                      | search 模块（[`reference/search.md`](search.md)）             |
+| Need to revise a paper (already have review comments) | paper 模块（revision 模式） |
 
 ### Quick Mode Selection Guide
 
@@ -54,7 +54,7 @@ Review this paper: [paste paper or provide file]
 | Want to learn by doing (guided review)                                    | guided            | originality |
 | Want to know this reviewer's own error profile before trusting its scores | calibration       | fidelity    |
 
-**Spectrum** (v3.2): _fidelity_ = template-heavy, predictable output; _balanced_ = default; _originality_ = exploratory, template-light. See `shared/mode_spectrum.md` for the full cross-skill spectrum table.
+**Spectrum** (v3.2): _fidelity_ = template-heavy, predictable output; _balanced_ = default; _originality_ = exploratory, template-light. （上游 ARS 的跨技能 spectrum 表 `shared/mode_spectrum.md` ⚠️ 依赖缺失，未随本套件发布；三档定义以本句为准。）
 
 Not sure? Use `full` for pre-submission review, `re-review` for post-revision verification. `calibration` is opt-in — run it once per domain when you want to know the reviewer's FNR/FPR before relying on its rubric scores.
 
@@ -133,7 +133,7 @@ User: "Review this paper"
          - Arbitration and argumentation for disputed issues
          - Devil's Advocate CRITICAL issues are specially flagged in the Editorial Decision
          - Editorial Decision Letter
-         - Revision Roadmap (prioritized, can be directly input to academic-paper revision mode)
+         - Revision Roadmap (prioritized, can be directly input to paper 模块 revision mode)
      |
 === Phase 2.5: REVISION COACHING (Socratic Revision Guidance) ===
      |
@@ -166,23 +166,23 @@ User: "Review this paper"
 
 ## Phase-by-phase Invocation Contract (v3.9.2)
 
-academic-paper-reviewer runs in 3 phases internally (Phase 0 field analysis → Phase 1 panel review → Phase 2 editorial synthesis). Within the full ARS pipeline, this skill sits at the orchestrator's Phase 5 (Review), but each agent inside the reviewer skill is single-phase relative to the skill's own phase numbering.
+The reviewer 模块 runs in 3 phases internally (Phase 0 field analysis → Phase 1 panel review → Phase 2 editorial synthesis). Within the full pipeline, this module sits at Stage 3 (Review), but each agent inside the module is single-phase relative to the module's own phase numbering.
 
 Two invocation modes:
 
-**Mode A — orchestrator-driven (default):** `pipeline_orchestrator_agent` (in `academic-pipeline` skill) dispatches `academic-paper-reviewer` as part of the full ARS pipeline Stage 3 (Review).
+**Mode A — orchestrator-driven (default):** `pipeline_orchestrator_agent` (in the pipeline 模块) dispatches the reviewer 模块 as part of pipeline Stage 3 (Review).
 
-**Mode B — phase-by-phase (cross-session resume):** User invokes one reviewer agent per phase across sessions, or runs the full reviewer panel standalone via `/ars-review` equivalent.
+**Mode B — phase-by-phase (cross-session resume):** User invokes one reviewer agent per phase across sessions, or runs the full reviewer panel standalone（经 [`../SKILL.md`](../SKILL.md) 以 `$ARGUMENTS[0]=reviewer` 进入）.
 
-In Mode B, **single-phase agents (Bucket A per `docs/design/2026-05-18-ars-v3.9.2-agent-phase-classification.md`) stay strictly within their assigned phase for writes**. The 6 Bucket A agents in academic-paper-reviewer are: `eic_agent`, `methodology_reviewer`, `domain_reviewer`, `perspective_reviewer`, `devils_advocate_reviewer` (all Phase 1 panel) + `editorial_synthesizer` (Phase 2 synthesis). Reading the full paper draft is **expected** for all reviewers — without context they cannot evaluate.
+In Mode B, **single-phase agents (Bucket A) stay strictly within their assigned phase for writes**. The 6 Bucket A agents in the reviewer 模块 are: `eic_agent`, `methodology_reviewer`, `domain_reviewer`, `perspective_reviewer`, `devils_advocate_reviewer` (all Phase 1 panel) + `editorial_synthesizer` (Phase 2 synthesis). Reading the full paper draft is **expected** for all reviewers — without context they cannot evaluate.
 
 The 1 Bucket D agent (`field_analyst` at Phase 0) is meta — it configures the panel; no boundary fence needed.
 
 The v3.6.2 Sprint Contract Protocol (paper-blind Phase 1 + paper-visible Phase 2 + data delimiter) additionally constrains all reviewer agents' within-phase discipline. Phase Boundary (phase scope) and Sprint Contract (within-phase paper-blind/paper-visible discipline) both apply — neither overrides the other.
 
-Routing into Mode B requires explicit user signal — `/ars-<mode>` slash command or `[direct-mode]` prefix. Ambiguous cross-phase input defaults to clarification per `.claude/CLAUDE.md` Routing Discipline + `shared/references/intent_clarification_protocol.md`.
+Routing into Mode B requires an explicit user signal — a `[direct-mode]` prefix or an explicit `$ARGUMENTS` selection（见 [`../SKILL.md`](../SKILL.md) 模块路由）. Ambiguous cross-phase input defaults to clarification before any phase runs.
 
-**Enforcement (v3.9.2):** prompt-level via Phase Boundary blocks on Bucket A agents + advisory verifier (`scripts/check_pipeline_integrity.py`). Deterministic PreToolUse hook + multi-phase envelope deferred to v3.10 active conductor (#134).
+**Enforcement:** prompt-level via Phase Boundary blocks on Bucket A agents. ⚠️ 依赖缺失，当前版本未实现：上游 ARS 的 advisory verifier（`scripts/check_pipeline_integrity.py`）、deterministic PreToolUse hook、multi-phase envelope 均未随本套件发布。
 
 ---
 
@@ -234,7 +234,9 @@ Helps authors understand problems themselves through progressive revelation. EIC
 
 ## Calibration Mode (v3.2)
 
-Opt-in mode that measures this reviewer's FNR / FPR / balanced accuracy against a user-supplied gold set (5-20 papers with known outcomes). Runs `full` 5x per paper with fresh context, cross-model default-on. Produces a Calibration Report attached as a confidence disclosure to subsequent reviews in the session.
+Opt-in mode that measures this reviewer's FNR / FPR / balanced accuracy against a user-supplied gold set. Runs the `full` review with fresh context per paper, cross-model default-on. Produces a Calibration Report attached as a confidence disclosure to subsequent reviews in the session.
+
+> **⚠️ 规则6 — 硬预算上限（不可自动绕过）**：calibration 金标论文 **≤3 篇**、每篇评审 **≤2 次**（全流程评审调用合计 ≤6 次）。任何超出（更多金标论文、更多重复次数、或对整批 5-20 篇跑 ensembling）**必须先获得用户显式批准**并在会话中记录批准语；orchestrator 与 reviewer 代理不得以"提升统计置信度"为由自行扩大预算。
 
 > See `../references/calibration_mode_protocol.md` for full spec: intake rules, ensembling methodology, output format, and failure cases this mode does not fix.
 
@@ -267,22 +269,22 @@ The Editorial Decision Letter structure is detailed in `../templates/editorial_d
 ### Upstream/Downstream Relationships
 
 ```
-deep-research --> academic-paper --> [integrity check] --> academic-paper-reviewer --> academic-paper (revision) --> academic-paper-reviewer (re-review) --> [final integrity] --> finalize
-   (research)       (writing)         (integrity audit)      (review)                    (revision)                    (verification review)                (final verification)   (finalization)
+search 模块 --> paper 模块 --> [integrity check] --> reviewer 模块 --> paper 模块 (revision) --> reviewer 模块 (re-review) --> [final integrity] --> finalize
+(文献语料)      (写作)          (integrity audit)     (评审)               (修订)                (verification review)          (final verification)   (定稿)
 ```
 
 ### Specific Integration Methods
 
 | Integration Direction                             | Description                                                                                                    |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Upstream: academic-paper -> reviewer**          | Receives the complete paper output from `academic-paper` full mode, directly enters Phase 0                    |
+| **Upstream: paper 模块 -> reviewer**              | Receives the complete paper output from paper 模块 `full` mode（`reference/paper.md`）, directly enters Phase 0 |
 | **Upstream: integrity check -> reviewer**         | In the Pipeline, the paper must pass integrity check before entering reviewer                                  |
-| **Downstream: reviewer -> academic-paper**        | The Revision Roadmap format can be directly used as reviewer feedback input for `academic-paper` revision mode |
-| **Downstream: reviewer (re-review) -> integrity** | After re-review completes, proceeds to final integrity verification                                            |
+| **Downstream: reviewer -> paper 模块**            | The Revision Roadmap format can be directly used as reviewer feedback input for paper 模块 revision mode |
+| **Downstream: reviewer (re-review) -> integrity** | After re-review completes, proceeds to final integrity verification（pipeline 模块 Stage 4.5）                  |
 
 ### Pipeline Usage Example
 
-> See `../references/integration_guide.md` for a complete 9-step pipeline usage example.
+> See `../references/integration_guide.md` for a complete pipeline usage example.
 
 ---
 
@@ -312,7 +314,7 @@ deep-research --> academic-paper --> [integrity check] --> academic-paper-review
 | `../references/review_quality_thinking.md`         | Cognitive framework for review quality: three lenses (internal validity, external validity, contribution), common reviewer traps, calibration questions | all reviewers              |
 | `../references/re_review_mode_protocol.md`         | Full re-review verification logic, R&R traceability output format, Socratic guidance after re-review                                                    | eic, editorial_synthesizer |
 | `../references/guided_mode_protocol.md`            | Guided mode dialogue flow, progressive revelation sequence, dialogue rules                                                                              | all reviewers              |
-| `../references/calibration_mode_protocol.md`       | Calibration mode: FNR/FPR/balanced accuracy measurement against user-supplied gold set, 5x ensembling, session-scoped confidence disclosure (v3.2)      | all reviewers              |
+| `../references/calibration_mode_protocol.md`       | Calibration mode: FNR/FPR/balanced accuracy measurement against user-supplied gold set, ensembling（受规则6硬上限：金标 ≤3 篇、每篇 ≤2 次）, session-scoped confidence disclosure (v3.2)      | all reviewers              |
 | `../references/integration_guide.md`               | Complete 9-step pipeline usage example                                                                                                                  | —                          |
 | `../references/changelog-reviewer.md`                       | Full version history                                                                                                                                    | —                          |
 
@@ -375,24 +377,25 @@ Follows the paper's language. Academic terms remain in English. User can overrid
 
 ---
 
-## Related Skills
+## Related Modules
 
-| Skill                 | Relationship                                                       |
+| Module                | Relationship                                                       |
 | --------------------- | ------------------------------------------------------------------ |
-| `academic-paper`      | Upstream (provides paper) + Downstream (receives revision roadmap) |
-| `deep-research`       | Upstream (provides research foundation)                            |
-| `tw-hei-intelligence` | Auxiliary (verifies higher education data accuracy)                |
-| `academic-pipeline`   | Orchestrated by (Stage 3 + Stage 3')                               |
+| paper（`reference/paper.md`） | Upstream (provides paper) + Downstream (receives revision roadmap) |
+| search（`reference/search.md`） | Upstream (provides literature corpus for domain analysis)          |
+| pipeline（`reference/pipeline.md`） | Orchestrated by (Stage 3 + Stage 3')                               |
+
+（上游 ARS 的辅助技能 `tw-hei-intelligence` ⚠️ 依赖缺失，未随本套件发布。）
 
 ---
 
 ## v3.6.2 Sprint Contract Hard Gate
 
 - **Reviewer hard gate.** All reviewer modes that ship with contracts (`reviewer_full`, `reviewer_methodology_focus`) now run two-call Phase 1 (paper-content-blind) + Phase 2 (paper-visible) orchestration. See `../references/sprint_contract_protocol.md`.
-- **Schema 13 sprint contract.** Template-driven acceptance criteria with `panel_size`, `acceptance_dimensions`, `failure_conditions` (with `severity` precedence + `cross_reviewer_quantifier` panel-relative thresholds), `measurement_procedure`, optional `override_ladder`, bounded `agent_amendments`. Validator: `scripts/check_sprint_contract.py`. Schema: `shared/sprint_contract.schema.json`.
+- **Schema 13 sprint contract.** Template-driven acceptance criteria with `panel_size`, `acceptance_dimensions`, `failure_conditions` (with `severity` precedence + `cross_reviewer_quantifier` panel-relative thresholds), `measurement_procedure`, optional `override_ladder`, bounded `agent_amendments`. ⚠️ 依赖缺失，当前版本未实现：validator `scripts/check_sprint_contract.py` 与 schema `shared/sprint_contract.schema.json` 未随本套件发布；契约以文字约束（`../references/sprint_contract_protocol.md` 与各 agent 文件）为准。
 - **Synthesizer three-step mechanical protocol.** Build cross-reviewer matrix → evaluate each failure_condition with panel-relative quantifier + expression vocabulary → resolve precedence by severity. Forbidden operations explicit in `../agents/editorial_synthesizer_agent.md`.
 - **methodology_focus reduced panel.** `reviewer_methodology_focus` mode runs a 2-reviewer panel (EIC + methodology only) instead of the default 5.
-- **Templates:** `shared/contracts/reviewer/full.json` (panel 5) and `shared/contracts/reviewer/methodology_focus.json` (panel 2). Reserved modes (`reviewer_re_review`, `reviewer_calibration`, `reviewer_guided`) keep pre-v3.6.2 behaviour until follow-up patch templates land.
+- **Templates:** ⚠️ 依赖缺失，当前版本未实现：`shared/contracts/reviewer/full.json`（panel 5）与 `shared/contracts/reviewer/methodology_focus.json`（panel 2）未随本套件发布，以 `../references/sprint_contract_protocol.md` 的文字版契约为准。Reserved modes (`reviewer_re_review`, `reviewer_calibration`, `reviewer_guided`) keep pre-v3.6.2 behaviour.
 
 ---
 
@@ -400,10 +403,10 @@ Follows the paper's language. Academic terms remain in English. User can overrid
 
 | Item             | Content                                                |
 | ---------------- | ------------------------------------------------------ |
-| Skill Version    | 1.10.0                                                 |
+| Skill Version    | 3.11.0（套件统一版本；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注） |
 | Last Updated     | 2026-06-01                                             |
 | Maintainer       | Cheng-I Wu                                             |
-| Dependent Skills | academic-paper v1.0+ (upstream/downstream integration) |
+| Dependent Modules | paper 模块（upstream/downstream integration）           |
 | Role             | Multi-perspective academic paper review simulator      |
 
 ---

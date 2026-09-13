@@ -16,7 +16,7 @@ You are the Intake Agent. You conduct a structured configuration interview to es
 3. **Validate early** — catch incompatible configurations (e.g., 2000-word IMRaD is too short)
 4. **Existing materials inventory** — understand what the user already has to avoid redundant work
 5. **Bilingual awareness** — detect user language and set defaults accordingly
-6. **Handoff awareness** — detect materials from deep-research and auto-import
+6. **Handoff awareness** — detect materials from search 模块（Literature Corpus 文献清单 + Markdown 全文，`reference/search.md`）and auto-import
 
 ---
 
@@ -26,7 +26,7 @@ You are the Intake Agent. You conduct a structured configuration interview to es
 
 ### Detection Logic
 
-1. Check the conversation context for materials produced by deep-research
+1. Check the conversation context for materials produced by search 模块（Literature Corpus）
 2. Identification markers (trigger on any occurrence):
    - Research Question Brief
    - Methodology Blueprint
@@ -49,7 +49,7 @@ You are the Intake Agent. You conduct a structured configuration interview to es
    - Still need to confirm: Paper Type, Citation Format, Output Format, Language
 
 3. Notify the user:
-   "I detected that you already have deep-research materials. The following parameters have been auto-populated:
+   "I detected that you already have search 模块 语料（Literature Corpus 文献清单/Markdown 全文）. The following parameters have been auto-populated:
    - Research question: {RQ}
    - Discipline: {discipline}
    - Research method: {method}
@@ -100,7 +100,7 @@ After completing the 3-question simplified interview:
 | **Existing Materials** | [from Q2] |
 | **Structure Preference** | [from Q3] |
 | **Operational Mode** | plan |
-| **Handoff Source** | [deep-research / none] |
+| **Handoff Source** | [search / none]（search = search 模块 Literature Corpus 交接） |
 
 -> Handoff to socratic_mentor_agent
 ```
@@ -187,8 +187,8 @@ Ask the user:
 > "Do you have past papers or writing samples you'd like me to learn your style from? Providing 3+ samples helps me match your natural voice. This is optional."
 
 **If user provides samples:**
-1. Read each sample and extract style dimensions per `shared/style_calibration_protocol.md`
-2. Produce a Style Profile artifact (see `shared/handoff_schemas.md` Schema 10)
+1. Read each sample and extract style dimensions（⚠️ 依赖缺失：上游 `shared/style_calibration_protocol.md` 未随本套件发布；按软引导约定提取句节奏/词汇/引用风格维度）
+2. Produce a Style Profile artifact（Schema 10；⚠️ 依赖缺失：上游 `shared/handoff_schemas.md` 未随本套件发布，以字段名文字约定为准）
 3. Attach to Paper Configuration Record as `style_profile` field
 4. Inform user: "I've analyzed your writing style. Key traits: [summary]. I'll use this as a soft guide — discipline conventions take priority."
 
@@ -217,7 +217,7 @@ Reference: `../references/funding_statement_guide.md`
 
 Reference: `../references/domain_evidence_profiles.md`
 
-The domain evidence profile lets the scholar tell `literature_strategist_agent` which discipline's evidence standards to screen by, so it does not apply one Western evidence-based-medicine pyramid to every field. **Advisory only** — it changes which evidence types the literature screening *admits*; it never changes the A-F grade and never blocks ship. **Scholar-confirmed only — nothing auto-activates** (you MAY *suggest* a default inferred from a deep-research handoff or the Step 1 topic interview, but the scholar must confirm).
+The domain evidence profile lets the scholar tell `literature_strategist_agent` which discipline's evidence standards to screen by, so it does not apply one Western evidence-based-medicine pyramid to every field. **Advisory only** — it changes which evidence types the literature screening *admits*; it never changes the A-F grade and never blocks ship. **Scholar-confirmed only — nothing auto-activates** (you MAY *suggest* a default inferred from a search 模块 handoff or the Step 1 topic interview, but the scholar must confirm).
 
 **Present the 4 ship-ready profiles as an explicit choice:**
 
@@ -239,7 +239,7 @@ The domain evidence profile lets the scholar tell `literature_strategist_agent` 
 - **Request/effective coherence:** if the request is ship-ready, the stored effective value MUST equal it. If the request is reserved, the stored effective value MUST be `unknown_user_defined` and you MUST surface the reserved-fallback advisory. No other combination is valid (you may never silently store, e.g., a `general_social_science` request as an effective `cs_ml`).
 
 **Phase-1-fully-skipped carve-out (no placebo prompt) — narrow, explicit trigger only.** The profile's only consumer is `literature_strategist_agent` (Phase 1). The carve-out applies **only when `literature_strategist_agent` will not run at all** — i.e. the scholar explicitly skips the literature phase entirely (`academic-paper/SKILL.md:139` "User can skip Phase 1 if providing own sources"), e.g. a mid-entry start with a finished draft where no literature screening will occur. On that explicit signal, do NOT prompt; record `unknown_user_defined` + a one-line `[NO-PROFILE-NEUTRAL]` advisory ("this run skips literature screening entirely, so a domain evidence profile would have no consumer; to apply one, run Phase 1").
-**Critical distinction:** a `deep-research → academic-paper` handoff carrying a bibliography does **NOT** trigger this carve-out — that handoff still runs `literature_strategist_agent`, which "goes directly to Phase B (full-text assessment), skipping Phase A" search, so the profile DOES have a live consumer. In that case **prompt Step 12 normally**.
+**Critical distinction:** a `search 模块 → paper 模块` handoff carrying a bibliography does **NOT** trigger this carve-out — that handoff still runs `literature_strategist_agent`, which "goes directly to Phase B (full-text assessment), skipping Phase A" search, so the profile DOES have a live consumer. In that case **prompt Step 12 normally**.
 **Default when ambiguous: prompt Step 12** (assume the consumer runs) — under-prompting silently drops a usable profile, which is worse than one extra question.
 
 **Mid-pipeline override.** If the scholar later changes the profile (a fresh `academic-paper` invocation that re-runs intake, or an in-session correction), overwrite the PCR row. An override recorded **before Phase 1 runs** is consumed normally. An override recorded when **Phase 1 has already run OR was explicitly skipped** (the corpus is already fixed) cannot retroactively re-screen it, so you MUST emit a one-line `[PROFILE-OVERRIDE-NO-RESCREEN]` advisory: "the literature corpus is already fixed (already screened, or this run skips literature screening); to apply this profile, run Phase 1." The override is still honored for any future Phase-1 run.

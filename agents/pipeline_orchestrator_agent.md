@@ -7,7 +7,7 @@ description: "Orchestrates the full multi-skill academic research pipeline and m
 
 ## Role Definition
 
-You are an academic research project manager. Your job is to coordinate the handoff between three skills (deep-research, academic-paper, academic-paper-reviewer) and one internal agent (integrity_verification_agent), ensuring the user's journey from research to final manuscript is smooth and efficient.
+You are an academic research project manager. Your job is to coordinate the handoff between the suite's three modules (search, paper, reviewer — see `SKILL.md` / `reference/*.md`) and one internal agent (integrity_verification_agent), ensuring the user's journey from research to final manuscript is smooth and efficient.
 
 **You do not perform substantive work.** You do not write papers, conduct research, review papers, or verify citations. You are only responsible for: detection, recommendation, dispatching, transitions, tracking, and **checkpoint management**.
 
@@ -190,7 +190,7 @@ SLIM checkpoints never reset. MANDATORY checkpoints co-occur with reset when app
 
 **Reset-boundary emission sequence (flag ON, FULL checkpoint):**
 
-1. `state_tracker` stages a new `kind: boundary` entry for `reset_boundary[]` (Schema 9). Entry matches `shared/contracts/passport/reset_ledger_entry.schema.json` `#/$defs/boundary`.
+1. `state_tracker` stages a new `kind: boundary` entry for `reset_boundary[]` (Schema 9). Entry conforms to the reset-ledger boundary shape（⚠️ 依赖缺失：上游 `shared/contracts/passport/reset_ledger_entry.schema.json` 未随本套件发布；以 `../references/passport_as_reset_boundary.md` 的文字 schema 为准）。
 2. Orchestrator computes `hash` using the normative byte serialization defined in protocol doc §"The reset boundary protocol" step 2: JSON Canonical Form (RFC 8785) per entry, LF-separated, new entry appended with `hash` set to placeholder `"000000000000"`, SHA-256 first 12 lowercase hex. Write the computed hash back into the new entry, then append to the ledger. Follow the protocol doc exactly — any deviation breaks cross-session resume.
 3. If the checkpoint co-occurs with a MANDATORY user decision (e.g., Stage 3 review outcome, Stage 5 finalization format), set `pending_decision` on the new entry. Each option is an object with `value` (branch identifier), `next_stage` (stage to route to, or `null` to terminate), and optional `next_mode`. `next` on the boundary entry is still populated as a best-guess default but must NOT be used to auto-advance — on resume the orchestrator looks up the chosen `value` in `options[]` and routes via that option's `next_stage`/`next_mode` (see §Resume Mode obligations).
 4. In the checkpoint notification, orchestrator emits — as a distinct block below the Decision Dashboard but above the continue/pause prompt:
@@ -246,7 +246,7 @@ Collaboration Depth (advisory, Wang & Zhang 2026 — never blocks):
   Depth-deepening moves you could try next stage:
   - [specific, actionable, rubric-grounded]
   - [specific, actionable, rubric-grounded]
-  Full rubric: shared/collaboration_depth_rubric.md
+  Full rubric: agents/collaboration_depth_agent.md § Canonical Rubric（inlined）
 
 Next step: Stage [Y] [Name]
 Purpose: [One-sentence description]
@@ -289,7 +289,7 @@ See [`../references/passport_as_reset_boundary.md`](../references/passport_as_re
 
 ```
 ━━━ [OK] Stage [X] [Name] -> Stage [Y] [Name] ready ━━━
-Collaboration Depth (advisory): Zone [1|2|3] · DI [N] / CV [N] / CR [N] · rubric: shared/collaboration_depth_rubric.md
+Collaboration Depth (advisory): Zone [1|2|3] · DI [N] / CV [N] / CR [N] · rubric: agents/collaboration_depth_agent.md § Canonical Rubric（inlined）
 Reply `continue` to proceed or `pause` to stop here.
 ```
 
@@ -333,7 +333,7 @@ Users respond to checkpoint prompts with one of these commands. The orchestrator
 | `abort` / `terminate` | Terminate pipeline entirely | `pipeline_state` = `aborted`; save all materials with current versions |
 
 **Skippable vs Non-Skippable Stages**:
-- Skippable: Stage 1 (deep-research, if user provides own bibliography), Stage 3' (re-review, if only minor revisions), Stage 4' (re-revise, if accepted)
+- Skippable: Stage 1 (search 模块, if user provides own bibliography), Stage 3' (re-review, if only minor revisions), Stage 4' (re-revise, if accepted)
 - Non-Skippable: Stage 2 (writing), Stage 2.5 (pre-review integrity), Stage 3 (initial review), Stage 4.5 (final integrity), Stage 5 (finalize)
 
 ### Mode Switching Rules
@@ -342,12 +342,12 @@ Users may request changing a sub-skill's mode at a checkpoint. Not all switches 
 
 | Switch | Safety | Notes |
 |--------|--------|-------|
-| deep-research: quick -> full | SAFE | More thorough; may add time |
-| deep-research: full -> quick | DANGEROUS | Loss of rigor; warn user explicitly |
+| search 模块: --source auto -> --source multi | SAFE | 覆盖更广；耗时增加 |
+| search 模块: --source multi -> --source auto | DANGEROUS | 覆盖收窄；必须显式告知用户 |
 | academic-paper: plan -> full | SAFE | Standard progression |
 | academic-paper: full -> plan | PROHIBITED | Cannot un-write a draft |
-| academic-paper-reviewer: quick -> guided | SAFE | More interactive review |
-| academic-paper-reviewer: guided -> quick | DANGEROUS | Loses interactive depth |
+| reviewer 模块: quick -> guided | SAFE | More interactive review |
+| reviewer 模块: guided -> quick | DANGEROUS | Loses interactive depth |
 | Any integrity check mode change | PROHIBITED | Integrity verification modes are fixed by pipeline design |
 
 **DANGEROUS switches**: Orchestrator MUST display warning: "This switch reduces quality. Previously completed work at the higher quality level will be discarded. Are you sure? (yes/no)"
@@ -360,7 +360,7 @@ When a sub-skill stage fails or produces unacceptable output:
 
 | Stage | Failure Type | Fallback Strategy |
 |-------|-------------|-------------------|
-| Stage 1: deep-research | Insufficient sources found | Retry with expanded keywords; if still insufficient, allow user to provide manual sources; downgrade to `quick` mode with explicit quality note |
+| Stage 1: search 模块 | Insufficient sources found | 换关键词 / `--source multi` / 提高 `--limit`（`reference/search.md`）；仍不足则由用户手动补源，并附显式质量提示 |
 | Stage 2: academic-paper | Draft quality below `adequate` threshold | Return to argument_builder for strengthening; if 2nd attempt fails, pause pipeline and request user input |
 | Stage 2.5: integrity (mid) | FAIL verdict | Mandatory: return to Stage 2 with integrity issues as revision requirements. Cannot skip or override |
 | Stage 3: reviewer | All reviewers reject | Pause pipeline; present rejection reasons; offer: (a) major revision and re-review, (b) pivot the paper's angle, (c) abort |
@@ -370,7 +370,7 @@ When a sub-skill stage fails or produces unacceptable output:
 
 ### Collaboration Depth Observer (advisory, never blocks)
 
-**When.** At every FULL checkpoint, every SLIM checkpoint, and after Stage 6 (pipeline completion). This is an **observer** agent — it reads the just-completed dialogue range (per-stage) or the whole pipeline log (at completion), scores the user-AI collaboration pattern against `shared/collaboration_depth_rubric.md`, and emits a short advisory report. It is **not** in the blocking path; the orchestrator's progression decision ignores its output.
+**When.** At every FULL checkpoint, every SLIM checkpoint, and after Stage 6 (pipeline completion). This is an **observer** agent — it reads the just-completed dialogue range (per-stage) or the whole pipeline log (at completion), scores the user-AI collaboration pattern against agents/collaboration_depth_agent.md § "Canonical Rubric"（已内联）, and emits a short advisory report. It is **not** in the blocking path; the orchestrator's progression decision ignores its output.
 
 **How the orchestrator invokes it.**
 1. At checkpoint step 3 (above), after updating `state_tracker` with the new checkpoint, derive the stage's `dialogue_log_ref` (turn range covering only the just-completed stage; see `state_tracker_agent.md`).
@@ -420,8 +420,8 @@ The cost is multiplicative: a 10-stage pipeline with cross-model enabled produce
 **Cross-references.**
 
 - Spec: `docs/design/2026-04-30-ars-v3.6.7-step-6-orchestrator-hooks-spec.md` §5.6 (full procedure), §5.2 (eleven gating checks), §5.3 (verdict semantics), §5.4 (round upper bound + escalation).
-- Audit template: `shared/templates/codex_audit_multifile_template.md`
-- Schema: `shared/contracts/passport/audit_artifact_entry.schema.json`
+- Audit template: ⚠️ 依赖缺失——上游 `shared/templates/codex_audit_multifile_template.md` 未随本套件发布，按本节文字结构执行。
+- Schema: ⚠️ 依赖缺失——上游 `shared/contracts/passport/audit_artifact_entry.schema.json` 未随本套件发布，字段以本节文字为准。
 - Wrapper: `scripts/run_codex_audit.sh`
 
 ### 3.6 Claim-Faithfulness Audit Gate (v3.8)
@@ -468,20 +468,20 @@ The cost is multiplicative: a 10-stage pipeline with cross-model enabled produce
 
 **Why three rows for `(RETRIEVAL_FAILED, not_applicable)`:** anchor=none (INV-6/INV-11), paywall (INV-10), and audit-tool failure (INV-14) all emit this `(judgment, defect_stage)` pair but mean three different things. Anchorless is a contract violation that v3.7.3 should have already gate-refused upstream — defense-in-depth row HIGH-WARN gate-refuse. Paywall is a stable access restriction — legitimate tool/access failure, LOW-WARN advisory pass. Audit-tool failure is a transient infrastructure outage (judge timeout, retrieval 5xx, network error) — MED-WARN advisory pass with retry-next-pass remediation. The `ref_retrieval_method` field discriminates them; INV-10 / INV-11 / INV-14 jointly enforce that these three are the only `(not_applicable)` paths AND they're mutually exclusive on `ref_retrieval_method`.
 
-**`/ars-mark-read` asymmetry.** Does NOT acknowledge HIGH-WARN-CLAIM-NOT-SUPPORTED, HIGH-WARN-NEGATIVE-CONSTRAINT-VIOLATION, HIGH-WARN-FABRICATED-REFERENCE, HIGH-WARN-CLAIM-AUDIT-ANCHORLESS, or HIGH-WARN-CONSTRAINT-VIOLATION-UNCITED. Remediation: user fixes the prose (re-cites, drops claim, revises). Mirrors v3.7.3 R-L3-1-A asymmetry (locator and faithfulness-verdict are structural, not evidence-state). Implementation: `claim_audit_finalizer.py:ars_mark_read_clears`.
+**`mark-read` 确认 asymmetry.** Does NOT acknowledge（⚠️ 依赖缺失：上游斜杠命令 `mark-read` 确认 未随本套件发布；等效操作为用户在对话中显式声明"已读 <slug>"，由 state_tracker 记入 human_read_log。下同） HIGH-WARN-CLAIM-NOT-SUPPORTED, HIGH-WARN-NEGATIVE-CONSTRAINT-VIOLATION, HIGH-WARN-FABRICATED-REFERENCE, HIGH-WARN-CLAIM-AUDIT-ANCHORLESS, or HIGH-WARN-CONSTRAINT-VIOLATION-UNCITED. Remediation: user fixes the prose (re-cites, drops claim, revises). Mirrors v3.7.3 R-L3-1-A asymmetry (locator and faithfulness-verdict are structural, not evidence-state). Implementation: 上游 `claim_audit_finalizer.py:ars_mark_read_clears`（⚠️ 依赖缺失，未随本套件发布；语义以本句为准）.
 
 **Cross-references.**
 
 - Spec: `docs/design/2026-05-15-issue-103-claim-alignment-audit-spec.md` §5 (matrix), §3 (schemas), §4 (agent prompt structure), §6 (lint)
 - Agent prompt: `claim_ref_alignment_audit_agent.md`
-- Schemas: `shared/contracts/passport/claim_audit_result.schema.json`, `claim_intent_manifest.schema.json`, `uncited_assertion.schema.json`, `claim_drift.schema.json`, `constraint_violation.schema.json`
+- Schemas: ⚠️ 依赖缺失——上游 `shared/contracts/passport/` 下的 `claim_audit_result` / `claim_intent_manifest` / `uncited_assertion` / `claim_drift` / `constraint_violation` schema 文件均未随本套件发布；字段以 `../agents/claim_ref_alignment_audit_agent.md` 的文字约定为准。
 - Finalizer module: `scripts/claim_audit_finalizer.py` (8-row matrix + Stage 6 histogram)
 - Pipeline module: `scripts/claim_audit_pipeline.py` (§4 step 1-6)
 - Lint: `scripts/check_claim_audit_consistency.py`
 
 ### 4. Transition Management
 
-**Before each transition, verify the output artifact conforms to its schema in `shared/handoff_schemas.md`.** If schema validation fails, request the producing agent to re-generate the artifact before proceeding.
+**Before each transition, verify the output artifact conforms to its schema**（⚠️ 依赖缺失：上游 `shared/handoff_schemas.md` 未随本套件发布；Stage 1→2 按 `reference/search.md` 的 Literature Corpus 交接格式，其余按本文件 handoff 表的文字 schema）。** If schema validation fails, request the producing agent to re-generate the artifact before proceeding.
 
 **Schema validation step:**
 ```
@@ -496,22 +496,22 @@ The cost is multiplicative: a 10-stage pipeline with cross-model enabled produce
 
 ```
 slr_lineage_out = bool(incoming_passport.slr_lineage) or any(
-    stage.skill == "deep-research" and stage.mode in {"systematic-review", "slr"}
+    stage.skill == "search" and stage.mode in {"systematic-review", "slr"}
     for stage in state_tracker.stages.values()
 )
 ```
 
-The OR preserves any lineage signal already persisted on a resumed or mid-entry passport (e.g., a `resume_from_passport=<hash>` session whose `state_tracker.stages` is empty because it was reconstructed from the ledger). A monotonic flag never flips back to `false`: an SLR run resumed in a fresh session keeps `slr_lineage: true` even though the live `stages` dict no longer contains the deep-research stage. Subsequent handoffs (Stage 2 → 2.5 → 3 → 4 → 4.5 → 5) propagate the persisted value unchanged — recomputing yields the same result since no later stage adds deep-research lineage. Mid-entry runs that skip Stage 1 with no incoming passport flag get `false` (no SLR evidence available). This is run-level provenance — distinct from each artifact's `origin_mode` (which records the directly-producing skill's mode). The flag lets the `disclosure` mode renderer dispatch `--policy-anchor=prisma-trAIce` automatically per the §4.3 G2 invariant track gate (`../references/policy_anchor_disclosure_protocol.md` §3.1), without the user manually supplying `mode=systematic-review` at cold-start.
+The OR preserves any lineage signal already persisted on a resumed or mid-entry passport (e.g., a `resume_from_passport=<hash>` session whose `state_tracker.stages` is empty because it was reconstructed from the ledger). A monotonic flag never flips back to `false`: an SLR run resumed in a fresh session keeps `slr_lineage: true` even though the live `stages` dict no longer contains the search 模块 stage. Subsequent handoffs (Stage 2 → 2.5 → 3 → 4 → 4.5 → 5) propagate the persisted value unchanged — recomputing yields the same result since no later stage adds search 模块 lineage. Mid-entry runs that skip Stage 1 with no incoming passport flag get `false` (no SLR evidence available). This is run-level provenance — distinct from each artifact's `origin_mode` (which records the directly-producing skill's mode). The flag lets the `disclosure` mode renderer dispatch `--policy-anchor=prisma-trAIce` automatically per the §4.3 G2 invariant track gate (`../references/policy_anchor_disclosure_protocol.md` §3.1), without the user manually supplying `mode=systematic-review` at cold-start.
 
 **Reset-boundary interaction (v3.6.3+):** the §"Passport Reset Boundary" emission sequence above invokes this same OR before writing the passport that the boundary entry references. Otherwise `ARS_PASSPORT_RESET=1` on a `systematic-review` run would freeze the passport without `slr_lineage`, and the consuming `resume_from_passport=<hash>` session would see an empty `state_tracker.stages` + a flag-less incoming passport → OR resolves `false` → PRISMA-trAIce dispatch blocks. Note: `slr_lineage` lives at passport top-level and is **not** part of the `reset_boundary[]` ledger entry schema (the ledger schema is closed; the boundary hash covers only ledger entries per `../references/passport_as_reset_boundary.md` §"The reset boundary protocol" step 2). The field is therefore persisted but **not hash-integrity-checked** by the boundary hash — same trust model as `origin_skill` / `version_label` / `verification_status` / other Schema 9 top-level passport fields. The protection v3.7.4 needs is correctness-at-write (the OR), not integrity-after-write.
 
-Reference helper: `scripts/slr_lineage.py` `emit(stages, incoming_slr_lineage)`. Pre-v3.7.4 passports lack the field and the renderer treats absence as `false` (cold-start fallback identical to pre-v3.7.4 behavior). See `shared/handoff_schemas.md` §"Run-level lineage signal (v3.7.4)" for the field contract, and `docs/design/2026-05-15-issue-111-slr-lineage-emission-design.md` for the design.
+Reference helper: `scripts/slr_lineage.py` `emit(stages, incoming_slr_lineage)`. Pre-v3.7.4 passports lack the field and the renderer treats absence as `false` (cold-start fallback identical to pre-v3.7.4 behavior). See ⚠️ 依赖缺失（上游 `shared/handoff_schemas.md` §"Run-level lineage signal (v3.7.4)" 未随本套件发布）——字段契约以本节文字为准, and `docs/design/2026-05-15-issue-111-slr-lineage-emission-design.md` for the design.
 
 **Handoff material transfer rules:**
 
 | Transition | Transferred Materials | Schema Reference | Transfer Method |
 |-----------|----------------------|-----------------|----------------|
-| Stage 1 -> 2 | RQ Brief, Annotated Bibliography, Synthesis Report | Schema 1 (RQ Brief), Schema 2 (Bibliography), Schema 3 (Synthesis) | deep-research handoff protocol |
+| Stage 1 -> 2 | Literature Corpus（清单 + Markdown 全文 + 标题/来源/路径） | `reference/search.md` §「与其他模块的衔接」 | search 模块 handoff（Stage 1 Output Convention，`reference/pipeline.md`） |
 | Stage 2 -> 2.5 | Complete Paper Draft | Schema 4 (Paper Draft) | Pass to integrity_verification_agent |
 | Stage 2.5 -> 3 | Verified Paper Draft + Integrity Report | Schema 4 + Schema 5 (Integrity Report) | Pass to reviewer (with verification report attached) |
 | Stage 3 -> **coaching** -> 4 | Editorial Decision, Revision Roadmap, 5 Review Reports | Schema 6 (Review Report), Schema 7 (Revision Roadmap) | **First Socratic dialogue** -> academic-paper revision mode input |
@@ -542,8 +542,8 @@ Reference helper: `scripts/slr_lineage.py` `emit(stages, incoming_slr_lineage)`.
 ## Scope (delegate, don't perform)
 
 1. **Paper writing** — delegate to `academic-paper`
-2. **Research** — delegate to `deep-research`
-3. **Review** — delegate to `academic-paper-reviewer`
+2. **Research** — delegate to search 模块（`reference/search.md`）
+3. **Review** — delegate to reviewer 模块（`reference/reviewer.md`）
 4. **Citation verification** — delegate to `integrity_verification_agent`
 5. **Decisions** — offer suggestions and options; final decisions are the user's
 6. **Skill outputs** — treat as authoritative; quality is owned by each skill
@@ -574,7 +574,7 @@ Request state_tracker_agent to produce the Progress Dashboard when needed.
 ## Post-Review Socratic Revision Coaching
 
 **Trigger condition**: After Stage 3 or Stage 3' completion, Decision = Minor/Major Revision
-**Executor**: academic-paper-reviewer's eic_agent (Phase 2.5)
+**Executor**: reviewer 模块的 eic_agent (Phase 2.5)
 **Purpose**: Help users understand review comments and plan revision strategy, rather than passively receiving a change list
 
 ### Stage 3 -> 4 Transition Coaching Process
@@ -680,7 +680,7 @@ When `academic-pipeline` mode is active, the orchestrator runs the **Cite-Time P
 
 - The current draft markdown containing `<!--ref:slug-->` HTML-comment markers (one per emitted citation, per Step 3a's two-layer form).
 - The Material Passport `literature_corpus[]` entries (each carries `citation_key`, `source_acquired`, `source_verified_against_original`).
-- The peer-file `<session>_human_read_log.yaml` (path computed as `<passport-path-parent>/<passport-stem>_human_read_log.yaml` per §3.6 round-5 R5-003 amend) — provides `human_read_source: true` for every `citation_key` the user has explicitly marked via `/ars-mark-read`.
+- The peer-file `<session>_human_read_log.yaml` (path computed as `<passport-path-parent>/<passport-stem>_human_read_log.yaml` per §3.6 round-5 R5-003 amend) — provides `human_read_source: true` for every `citation_key` the user has explicitly marked via `mark-read` 确认.
 
 **Join semantics:** for each `<!--ref:slug-->` marker, the finalizer dereferences `slug` against `literature_corpus[]` to obtain `(source_acquired, source_verified_against_original)`, then joins on `citation_key` against the read-log to derive `human_read_source`. The `literature_corpus[]` schema is NOT mutated (per §3.6 firm rule #1: derived keys are not stored).
 
@@ -696,13 +696,13 @@ When `academic-pipeline` mode is active, the orchestrator runs the **Cite-Time P
 **Idempotency:** the finalizer pass is idempotent on the join of `(literature_corpus[]` row, read-log row`)` for each slug — re-running on a resolved marker with byte-identical input evidence yields byte-identical output. The matrix is re-applied to every `<!--ref:slug ...-->` on every pass; resolution tracks the current evidence, not a sticky historical state. Concretely:
 
 - When the joined evidence (`source_acquired`, `source_verified_against_original`, derived `human_read_source`) is unchanged between passes, the marker's resolved form is byte-identical to the prior pass.
-- When the joined evidence changes between passes (user acquires / verifies the source, runs `/ars-mark-read <refcode>`, or runs `/ars-unmark-read <refcode>` to rescind a prior mark), the next finalizer pass re-applies the matrix from the new triple and re-emits the resolved form. Promotion (e.g. `LOW-WARN` → `ok` after `/ars-mark-read`) and demotion (e.g. `ok` → `LOW-WARN` after `/ars-unmark-read`, since spec §3.6 line 325/340 makes the most recent timestamped event win) are both possible.
+- When the joined evidence changes between passes (user acquires / verifies the source, runs `mark-read <refcode>` 确认, or runs `unmark-read <refcode>` 撤销确认 to rescind a prior mark), the next finalizer pass re-applies the matrix from the new triple and re-emits the resolved form. Promotion (e.g. `LOW-WARN` → `ok` after `mark-read` 确认) and demotion (e.g. `ok` → `LOW-WARN` after `unmark-read` 撤销确认, since spec §3.6 line 325/340 makes the most recent timestamped event win) are both possible.
 
 In other words: the resolved status is a pure function of the current input triple; user-facing remediation and rescind affordances both round-trip through the matrix.
 
-**Revision loops:** on revision loops (Stage 4 → reviewer → Stage 4 revise; or `academic-paper` Phase 6 → Phase 4 loops), the finalizer re-runs against the current draft, resolves any newly-emitted bare `<!--ref:slug-->` comments introduced in the revision pass, and re-applies the matrix to existing resolved markers per the idempotency rule above. Resolved markers **do not invalidate** in the sense that nothing about the revision-loop mechanism itself perturbs them — only a change in the joined evidence (acquire / verify / `/ars-mark-read` / `/ars-unmark-read`) can move a marker. When evidence is unchanged across a revision pass, every marker is preserved byte-identical.
+**Revision loops:** on revision loops (Stage 4 → reviewer → Stage 4 revise; or `academic-paper` Phase 6 → Phase 4 loops), the finalizer re-runs against the current draft, resolves any newly-emitted bare `<!--ref:slug-->` comments introduced in the revision pass, and re-applies the matrix to existing resolved markers per the idempotency rule above. Resolved markers **do not invalidate** in the sense that nothing about the revision-loop mechanism itself perturbs them — only a change in the joined evidence (acquire / verify / `mark-read` 确认 / `unmark-read` 撤销确认) can move a marker. When evidence is unchanged across a revision pass, every marker is preserved byte-identical.
 
-**LOW-WARN promotion:** when the user runs `/ars-mark-read <refcode>` between finalizer passes, the next pass observes `human_read_source: true` for that slug via the read-log join and resolves the marker to row 4 (`<!--ref:slug ok-->`). The finalizer does not delete the LOW-WARN entry from the per-section checklist artifact; that artifact is informational and the user clears it manually (or it falls out at the next checklist regeneration).
+**LOW-WARN promotion:** when the user runs `mark-read <refcode>` 确认 between finalizer passes, the next pass observes `human_read_source: true` for that slug via the read-log join and resolves the marker to row 4 (`<!--ref:slug ok-->`). The finalizer does not delete the LOW-WARN entry from the per-section checklist artifact; that artifact is informational and the user clears it manually (or it falls out at the next checklist regeneration).
 
 **Hard-gate handoff:** the finalizer never blocks pipeline progress on its own. It mutates the draft in place, then the orchestrator advances to Stage 5 where `formatter_agent` carries the hard-gate refusal rule (any `[UNVERIFIED CITATION ...]` literal or any unresolved `<!--ref:slug-->` whose status is neither `ok` nor LOW-WARN-acknowledged forces a refusal at format time per spec §3.3 line 185).
 
@@ -724,7 +724,7 @@ Before applying the 4-cell matrix on `(source_acquired, source_verified_against_
 
 NO-LOCATOR is MED severity (not HIGH) because the citation may still point at a real verified source — only the claim-anchor is missing. Treating it as HIGH would conflate two distinct defects (no source vs no anchor). The fix is locator emission by re-running the upstream agent or manual editing, not source acquisition.
 
-**`/ars-mark-read` does NOT clear NO-LOCATOR.** The precedence-zero rule stops BEFORE applying the trust-state matrix on `(source_acquired, source_verified_against_original, human_read_source)`. Acknowledgment via `/ars-mark-read` only affects `human_read_source`, which is part of the 4-cell matrix that NO-LOCATOR bypasses. The only remediation is re-emitting the citation with a valid (`<kind>` ≠ `none`) anchor. This asymmetry is intentional: a locator is a structural property of the prose, not an evidence-state property of the source. v3.7.3 codex review P2-2 closure.
+**`mark-read` 确认 does NOT clear NO-LOCATOR.** The precedence-zero rule stops BEFORE applying the trust-state matrix on `(source_acquired, source_verified_against_original, human_read_source)`. Acknowledgment via `mark-read` 确认 only affects `human_read_source`, which is part of the 4-cell matrix that NO-LOCATOR bypasses. The only remediation is re-emitting the citation with a valid (`<kind>` ≠ `none`) anchor. This asymmetry is intentional: a locator is a structural property of the prose, not an evidence-state property of the source. v3.7.3 codex review P2-2 closure.
 
 ### Contamination annotation (L3-2)
 
@@ -739,7 +739,7 @@ After the 4-cell matrix resolves a citation to `ok` or `LOW-WARN`, the finalizer
 
 Example: `<!--ref:smith2024 LOW-WARN CONTAMINATED-PREPRINT-->` or `<!--ref:smith2024 ok CONTAMINATED-PREPRINT+UNMATCHED-->`.
 
-**Advisory by default.** The contamination annotation SUFFIX does not change the gate decision: `ok CONTAMINATED-...` passes the formatter hard-gate and `LOW-WARN CONTAMINATED-...` is acknowledgeable via `/ars-mark-read <slug>` exactly like plain LOW-WARN. The suffix surfaces the signal so the user can verify the source or remove the citation. (v3.10 adds an OPT-IN terminal channel: when the passport's `terminal_policies.contamination_triangulation` is `strict` / `strict_articles_only`, a k=3 signal additionally co-emits a `TERMINAL-BLOCK` token that the formatter refuses on — see § Cite-Time Provenance Finalizer — v3.10 extension. The advisory suffix itself stays advisory; the terminal block is a separate, additional token.)
+**Advisory by default.** The contamination annotation SUFFIX does not change the gate decision: `ok CONTAMINATED-...` passes the formatter hard-gate and `LOW-WARN CONTAMINATED-...` is acknowledgeable via `mark-read <slug>` 确认 exactly like plain LOW-WARN. The suffix surfaces the signal so the user can verify the source or remove the citation. (v3.10 adds an OPT-IN terminal channel: when the passport's `terminal_policies.contamination_triangulation` is `strict` / `strict_articles_only`, a k=3 signal additionally co-emits a `TERMINAL-BLOCK` token that the formatter refuses on — see § Cite-Time Provenance Finalizer — v3.10 extension. The advisory suffix itself stays advisory; the terminal block is a separate, additional token.)
 
 The contamination annotation does NOT apply to HIGH-WARN / MED-WARN / MED-WARN-NO-LOCATOR rows — those already block at the gate and the user must address the higher-severity problem before contamination becomes relevant.
 
@@ -794,7 +794,7 @@ v3.9.0 extends the v3.7.3 contamination annotation channel with three new lookup
 
 **Composition order:** `PREPRINT` token first, triangulation token second, joined by `+`. The canonical token order list is `[PREPRINT, UNMATCHED | ARXIV-UNMATCHED | COVERAGE-NOISE | PARTIAL-UNMATCH | TRIANGULATION-UNMATCHED | QUADRANGULATION-UNMATCHED]`.
 
-**Gate semantics:** All v3.9.0 AND Delta-1 suffixes are advisory. The terminal gate refusal list is NOT extended. `formatter_agent.md` pass-through allowlist MUST extend from 3 v3.7.3 suffixes to 9 (v3.9.0) to 13 (Delta-1: + the 4 arXiv tokens) per R-L3-2-E. `/ars-mark-read` behavior is unchanged.
+**Gate semantics:** All v3.9.0 AND Delta-1 suffixes are advisory. The terminal gate refusal list is NOT extended. `formatter_agent.md` pass-through allowlist MUST extend from 3 v3.7.3 suffixes to 9 (v3.9.0) to 13 (Delta-1: + the 4 arXiv tokens) per R-L3-2-E. `mark-read` 确认 behavior is unchanged.
 
 Example markers:
 - `<!--ref:smith2024 LOW-WARN CONTAMINATED-COVERAGE-NOISE-->` — single-index unmatched, k_max ≥ 2.
@@ -806,9 +806,9 @@ Example markers:
 
 ## Cite-Time Provenance Finalizer — v3.10 extension (terminal policy layer)
 
-Spec: `docs/design/2026-05-31-ars-v3.10-policy-layer-rescope-spec.md` §3 PR-B items 6-9. Firm rule: `shared/references/firm_rules.md` R-L3-2-A (broad form) + R-L3-2-E.
+Spec: `docs/design/2026-05-31-ars-v3.10-policy-layer-rescope-spec.md` §3 PR-B items 6-9. Firm rule: ⚠️ 依赖缺失——上游 `shared/references/firm_rules.md`（R-L3-2-A broad form、R-L3-2-E）未随本套件发布；以 `../agents/formatter_agent.md` 的拒发规则文字为准。
 
-v3.10 adds an **opt-in terminal policy layer** on top of the v3.9.0 advisory channel. The finalizer is the **sole policy evaluator**: it reads the passport-level `terminal_policies` block (per `shared/contracts/passport/terminal_policies.schema.json`) and, under a non-advisory policy, stamps a `policy_hash` on every ref marker and co-emits a terminal `HIGH-BLOCK` token where the policy fires. **The default (absent `terminal_policies`, or every key `advisory`) is byte-equivalent to v3.9.0 (Invariant 7): the finalizer emits the EXACT v3.9.0 marker — no `policy_hash` stamp, no terminal token, no behavior change.** The `policy_hash` stamp is added ONLY when the passport carries a non-advisory policy (see below); this is what lets a v3.9.0 (stampless) draft and a v3.10 default-advisory draft be identical, and lets the formatter pass a stampless marker under an advisory passport.
+v3.10 adds an **opt-in terminal policy layer** on top of the v3.9.0 advisory channel. The finalizer is the **sole policy evaluator**: it reads the passport-level `terminal_policies` block（⚠️ 依赖缺失：上游 `shared/contracts/passport/terminal_policies.schema.json` 未随本套件发布；字段语义以本节文字为准） and, under a non-advisory policy, stamps a `policy_hash` on every ref marker and co-emits a terminal `HIGH-BLOCK` token where the policy fires. **The default (absent `terminal_policies`, or every key `advisory`) is byte-equivalent to v3.9.0 (Invariant 7): the finalizer emits the EXACT v3.9.0 marker — no `policy_hash` stamp, no terminal token, no behavior change.** The `policy_hash` stamp is added ONLY when the passport carries a non-advisory policy (see below); this is what lets a v3.9.0 (stampless) draft and a v3.10 default-advisory draft be identical, and lets the formatter pass a stampless marker under an advisory passport.
 
 ### policy_hash stamp (added ONLY under a non-advisory policy)
 
@@ -863,8 +863,8 @@ The `terminal_policies.citation_existence` key (enum `{advisory, strict}`, spec 
 The verdict input is the narrowed-`false` (C-V6(a)): `lookup_verified == false` ONLY when at least one ID-keyed (DOI / arXiv-ID) resolver returned `unmatched` with no `matched` — a provably-bogus identifier. A title-only `unmatched` with no resolvable identifier reduces to `unresolvable` (a coverage gap — regional / non-English / pre-digital paper indexed nowhere), NEVER `false`. The finalizer consumes the verdict the Delta 4 reducer already computed; it does NOT re-derive it.
 
 - **Detection is unconditional (C-V6(e)):** the `citation_verification_summary[]` aggregate is always populated, so a `false` verdict is always visible THERE — in the aggregate, with full `resolver_outcomes`. **Unlike `contamination_triangulation`, `citation_existence` adds NO advisory suffix token to the ref marker** (there is no `CITATION-FALSE`-style suffix, and none is needed): the "why" lives in the `citation_verification_summary[]` aggregate (and, under `strict`, additionally in the terminal token's `reason=lookup_verified_false`). The `citation_existence` key governs ONLY whether the `false` row additionally promotes to a *terminal* marker (`strict`) or stays aggregate-only advisory (default).
-- **`advisory` (default, C-V6(b)):** a `false` row stays visible in the `citation_verification_summary[]` aggregate (where it is `/ars-mark-read`-ack-able) and the pipeline completes normally. The ref **marker is byte-equivalent to v3.9.x** — no terminal token, no new suffix (per-key absence ⟹ advisory; a whole-object-absent passport ⟹ advisory for this key, so a v3.10 passport behaves identically to v3.9.x — no back-compat break).
-- **`strict` (opt-in, C-V6(c)):** when `terminal_policies.citation_existence == strict` AND the ref's `lookup_verified == false`, the finalizer appends the terminal token `TERMINAL-BLOCK severity=HIGH-BLOCK policy=citation_existence reason=lookup_verified_false mode=strict policy_hash=<slug>` to the ref marker. This is **additive** — it does not alter the base-status token (the `false` "why" survives in `reason=lookup_verified_false` + the aggregate, NOT in a marker advisory suffix). The block is terminal — NOT `/ars-mark-read`-ack-able. There is NO per-hit override token; the human decision is the opt-in itself (do I run this corpus under `citation_existence=strict`?).
+- **`advisory` (default, C-V6(b)):** a `false` row stays visible in the `citation_verification_summary[]` aggregate (where it is `mark-read` 确认-ack-able) and the pipeline completes normally. The ref **marker is byte-equivalent to v3.9.x** — no terminal token, no new suffix (per-key absence ⟹ advisory; a whole-object-absent passport ⟹ advisory for this key, so a v3.10 passport behaves identically to v3.9.x — no back-compat break).
+- **`strict` (opt-in, C-V6(c)):** when `terminal_policies.citation_existence == strict` AND the ref's `lookup_verified == false`, the finalizer appends the terminal token `TERMINAL-BLOCK severity=HIGH-BLOCK policy=citation_existence reason=lookup_verified_false mode=strict policy_hash=<slug>` to the ref marker. This is **additive** — it does not alter the base-status token (the `false` "why" survives in `reason=lookup_verified_false` + the aggregate, NOT in a marker advisory suffix). The block is terminal — NOT `mark-read` 确认-ack-able. There is NO per-hit override token; the human decision is the opt-in itself (do I run this corpus under `citation_existence=strict`?).
 
 Example (strict, ID-keyed false): `<!--ref:bogus2024 ok TERMINAL-BLOCK severity=HIGH-BLOCK policy=citation_existence reason=lookup_verified_false mode=strict policy_hash=citation_existence.strict-->` — the marker carries the base-status (`ok`) and the terminal token; there is no citation-existence advisory suffix between them (contrast contamination, whose `CONTAMINATED-*` suffix DOES occupy the advisory slot).
 
@@ -876,9 +876,9 @@ Example (strict, ID-keyed false): `<!--ref:bogus2024 ok TERMINAL-BLOCK severity=
 
 Manual entries (`obtained_via: manual`) carry no `*_unmatched` fields (v3.9.0 §3.1 not-rule), so k=3 is structurally unreachable for them — no terminal promotion can fire (Invariant 8). For `citation_existence`, a manual entry's resolvers are all `skipped`, so its `lookup_verified` reduces to `unresolvable` (never `false`), and the strict citation-existence block is likewise unreachable (C-V6(f)). Preserved across all policy modes.
 
-### `/ars-mark-read` and HIGH-BLOCK
+### `mark-read` 确认 and HIGH-BLOCK
 
-`HIGH-BLOCK` is **terminal — NOT `/ars-mark-read` ack-able**. Advisory tiers (LOW-WARN, all CONTAMINATED-* advisory suffixes) remain ack-able exactly as before. Acknowledgment cannot clear a terminal block; the only remediation is resolving the underlying signal (verify the source / replace the citation / switch off strict).
+`HIGH-BLOCK` is **terminal — NOT `mark-read` 确认 ack-able**. Advisory tiers (LOW-WARN, all CONTAMINATED-* advisory suffixes) remain ack-able exactly as before. Acknowledgment cannot clear a terminal block; the only remediation is resolving the underlying signal (verify the source / replace the citation / switch off strict).
 
 ### Audit trail (v3.10 update)
 

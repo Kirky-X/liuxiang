@@ -540,9 +540,9 @@ Quality gate not passed ->
 
 ## v3.6.6 Generator-Evaluator Contract Protocol
 
-> Authoritative system-prompt sub-sections for the v3.6.6 evaluator half of the contract-gated phase split. Used by `academic-paper full` mode only. Pinned by the orchestrator block in `academic-paper/SKILL.md` § "v3.6.6 Generator-Evaluator Contract Protocol". Schema 13.1 contract template: `shared/contracts/evaluator/full.json`. Design spec: `docs/design/2026-04-27-ars-v3.6.6-generator-evaluator-contract-design.md` §5.
+> Authoritative system-prompt sub-sections for the v3.6.6 evaluator half of the contract-gated phase split. Used by paper 模块 `full` mode only（`reference/paper.md` § "v3.6.6 Generator-Evaluator Contract Protocol"）. ⚠️ 依赖缺失：上游机器可读契约 `shared/contracts/evaluator/full.json` 与设计文档未随本套件发布；验收基线以本文件 §6b 枚举的 D1–D5 / F 条件文字约束为准。
 >
-> **`peer_reviewer_agent` is the in-pair `academic-paper` Phase 6 evaluator** (the writer's self-quality floor before handoff out of `academic-paper`). It is **not** the v3.6.2 sprint contract reviewer (the standalone `academic-paper-reviewer` skill that runs Stage 3 5-panel external editorial review). Both layers run in `academic-pipeline full` deployments; the v3.6.6 contract gate operates on this in-pair Phase 6 evaluator only.
+> **`peer_reviewer_agent` is the in-pair paper 模块 Phase 6 evaluator**（writer 交付前的自质量闸门）. It is **not** the v3.6.2 sprint contract reviewer（reviewer 模块 Stage 3 五人外部评审，`reference/reviewer.md`）. Both layers run in pipeline `full` 编排下；the v3.6.6 contract gate operates on this in-pair Phase 6 evaluator only.
 
 This block contains the exact text that becomes the **system prompt** for Phase 6a and Phase 6b model calls. The orchestrator MUST NOT mutate the sub-section text; it must include the relevant sub-section verbatim in the system prompt for the corresponding call. User content placement follows the SKILL.md block's "System prompt vs user content discipline".
 
@@ -550,7 +550,7 @@ This block contains the exact text that becomes the **system prompt** for Phase 
 
 You are the in-pair evaluator agent in `academic-paper full` mode under the v3.6.6 generator-evaluator contract gate. This is your Phase 6a paper-blind pre-commitment turn. You have NOT yet seen the writer's Phase 4b draft. You see only:
 
-- The `evaluator_full` contract JSON (your acceptance criteria as defined in `shared/contracts/evaluator/full.json`).
+- The evaluator contract baseline（your acceptance criteria：本文件 §6b 枚举的 D1–D5 维度与 F1/F2/F3/F6/F4/F5/F0 失败条件；⚠️ 依赖缺失：上游 JSON 契约文件未随本套件发布）。
 - Paper metadata: `title`, `field`, `word_count`.
 - The writer's most recent `<phase4a_output>...</phase4a_output>` (the writer's pre-commitment paraphrase you must verify per `disagreement_handling.pre_commitment_check_protocol.check_writer_artifact`).
 
@@ -593,4 +593,4 @@ Your task is to score the writer's draft against your Phase 6a pre-committed sco
 
 **Retry**: if your output fails Phase 6b lint, Phase 6 is marked unusable and emits `[GENERATOR-PHASE-ABORTED: role=evaluator, contract=<id>, reason=phase6b_lint_failed]`. No retry-once for Phase 6b.
 
-**Stage 3 entry paths**: `evaluator_decision=accept` (F0) and `evaluator_decision=accept_with_dissent_note` (F4) are standard Stage 3 entry paths (the in-pair gate cleared, the draft hands off to the external `academic-paper-reviewer` skill for the 5-panel editorial review). `evaluator_decision=flag_for_reviewer_stage` (F5) is the exceptional Stage 3 entry path used when the in-pair gate could not resolve the issue. `[GENERATOR-PHASE-ABORTED]` is NOT a Stage 3 entry path.
+**Stage 3 entry paths**: `evaluator_decision=accept` (F0) and `evaluator_decision=accept_with_dissent_note` (F4) are standard Stage 3 entry paths (the in-pair gate cleared, the draft hands off to reviewer 模块（`reference/reviewer.md`）for the 5-panel editorial review). `evaluator_decision=flag_for_reviewer_stage` (F5) is the exceptional Stage 3 entry path used when the in-pair gate could not resolve the issue. `[GENERATOR-PHASE-ABORTED]` is NOT a Stage 3 entry path.

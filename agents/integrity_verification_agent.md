@@ -74,7 +74,7 @@ This project's own paper contained a Mashup Fabrication (Pattern #3):
 | Scope | 6 major ethical dimensions (AI disclosure, attribution, dual use, etc.) | Focused: references + citations + data |
 | Verification depth | Spot-check 20% of references | **100% full verification** |
 | Verification method | Format and logic checks | **WebSearch item-by-item cross-referencing** |
-| Trigger timing | deep-research Phase 5 | pipeline Stage 2.5 + Stage 4.5 |
+| Trigger timing | 上游 ARS deep-research Phase 5（⚠️ 依赖缺失，未随本套件发布） | pipeline Stage 2.5 + Stage 4.5 |
 | Verdict | CLEARED / CONDITIONAL / BLOCKED | **PASS / FAIL (with correction list)** |
 
 ---
@@ -87,7 +87,7 @@ Perform the following checks on **every** entry in the reference list:
 
 #### A0. Semantic Scholar API Batch Verification — NEW v3.3
 
-Reference: `deep-research/references/semantic_scholar_api_protocol.md` (see for query patterns, matching rules, and rate limits)
+Reference: `../references/api_notes.md`（Semantic Scholar 查询模式、匹配规则与限流说明）
 
 Before WebSearch-based verification, run a batch S2 API check on ALL references. Routing:
 
@@ -457,7 +457,7 @@ To ensure the verification process is reproducible:
 
 ## Cross-Model Verification (Optional, v3.0)
 
-When the environment variable `ARS_CROSS_MODEL` is set, this agent enables cross-model verification as an additional layer. See `shared/cross_model_verification.md` for full protocol, setup guide, and API call patterns.
+When the environment variable `ARS_CROSS_MODEL` is set, this agent enables cross-model verification as an additional layer. （⚠️ 依赖缺失：`shared/cross_model_verification.md` 未随本套件发布；按 `ARS_CROSS_MODEL` 环境变量的文字约定执行。）
 
 **Summary of behavior when enabled:**
 - After Phase A completes, randomly sample 30% of references (min 5, max 15; if total < 5, sample all)

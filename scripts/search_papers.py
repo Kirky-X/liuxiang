@@ -46,7 +46,9 @@ S2_FIELDS = "title,authors,year,publicationDate,abstract,externalIds,openAccessP
 # 而 requests 跟随该重定向时常出现间歇性读超时，直接用 https 可省去这次往返。
 ARXIV_API_URL = os.environ.get("ARXIV_API_URL", "https://export.arxiv.org/api/query")
 # 以下平台均免费。Crossref/OpenAlex 鼓励带联系邮箱进入"礼貌用户池"（更高速率限制），不强制但推荐。
-CONTACT_EMAIL = os.environ.get("LIUXIANG_EMAIL", "liuxiang@example.com")
+# Crossref/OpenAlex 礼貌池邮箱：仅接受真实邮箱；未设置 LIUXIANG_EMAIL 时不发送 mailto
+# 参数（与 download_paper.py 的 UNPAYWALL_EMAIL 行为对齐——假邮箱会被数据源拒绝或降权）
+CONTACT_EMAIL = os.environ.get("LIUXIANG_EMAIL", "")
 DBLP_API_URL = os.environ.get("DBLP_API_URL", "https://dblp.org/search/publ/api")
 EUROPEPMC_API_URL = os.environ.get("EUROPEPMC_API_URL", "https://www.ebi.ac.uk/europepmc/webservices/rest/search")
 # CORE 需要 API Key（免费注册 https://core.ac.uk/api-keys，免费层 10k 请求/月）。
@@ -211,7 +213,7 @@ def search_openalex(query: str, limit: int, mode: str):
     params = {
         "search": query,
         "per_page": min(limit, 200),
-        "mailto": CONTACT_EMAIL,
+        **({"mailto": CONTACT_EMAIL} if CONTACT_EMAIL else {}),
         "select": "id,display_name,authorships,publication_date,abstract_inverted_index,doi,primary_location,open_access",
     }
     resp = _get_with_retry(OPENALEX_API_URL, params, timeout=20)
@@ -261,7 +263,7 @@ def search_crossref(query: str, limit: int, mode: str):
     params = {
         "query.bibliographic": query,
         "rows": min(limit, 100),
-        "mailto": CONTACT_EMAIL,
+        **({"mailto": CONTACT_EMAIL} if CONTACT_EMAIL else {}),
         "select": "DOI,title,author,published,container-title,abstract,URL",
     }
     resp = _get_with_retry(CROSSREF_API_URL, params, timeout=20)
