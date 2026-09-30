@@ -49,6 +49,8 @@ This template is used by `editorial_synthesizer_agent` to produce the final Edit
 1. [Consensus content — indicate which 3 agree and which 1 has a different view]
 2. [...]
 
+> Each consensus item lists the issue IDs it consolidates: `[CONSENSUS-2] (R1-4, R2-7, DA-2) — …`. When several panelists raised the same defect, merge per `../references/issue_lifecycle_protocol.md` §5: the surviving issue keeps the ID of the source earliest in panel order (`EIC` → `R1` → `R2` → `R3` → `DA`), absorbed IDs are recorded as `merged-from`, and the merged item takes the highest severity.
+
 ### Points of Disagreement
 
 **Disagreement 1: [Issue name]**
@@ -79,32 +81,35 @@ Requirements:
 
 [Only needed for Minor Revision and Major Revision]
 
-| # | Revision Item | Source Reviewer | Severity | Section | Estimated Effort |
-|---|--------------|----------------|----------|---------|-----------------|
-| R1 | [Description] | [EIC/R1/R2/R3] | Critical | [Section name] | [X days] |
-| R2 | [Description] | [Source] | Critical/Major | [Section name] | [X days] |
-| R3 | [Description] | [Source] | Major | [Section name] | [X days] |
+⚠️ Roadmap rows are numbered `RM-<NN>` and carry an `origin` column of source issue IDs. They are **not** numbered `R1`/`R2`/`R3` — those labels belong to the panelists, and reusing them here makes "R2" ambiguous within this same document.
+
+| # | Revision Item | Origin (issue IDs) | Source Reviewer | Severity | Section | Estimated Effort |
+|---|--------------|-------------------|----------------|----------|---------|-----------------|
+| RM-1 | [Description] | [R2-3, DA-1] | [EIC/R1/R2/R3/DA] | Critical | [Section name] | [X days] |
+| RM-2 | [Description] | [Issue IDs] | [Source] | Critical/Major | [Section name] | [X days] |
+| RM-3 | [Description] | [Issue IDs] | [Source] | Major | [Section name] | [X days] |
 ...
 
 ### Required Item Details
 
-**R1: [Title]**
+**RM-1: [Title]**
+- **Origin issue ID(s)**: [R2-3 (merged-from: DA-1)] / [Criterion: ARC-02]
 - **Problem**: [Specific description]
 - **Source**: [Which reviewer raised it, citing report passage]
-- **Requirement**: [Specifically how to fix it]
+- **Requirement**: [Specifically what the fix must accomplish]
 - **Acceptance criteria**: [How to confirm the issue is resolved after fixing]
 
-**R2: [Title]**
+**RM-2: [Title]**
 - [Same format as above]
 
 ---
 
 ## Suggested Revisions (Should Fix)
 
-| # | Revision Item | Source Reviewer | Priority | Section | Expected Improvement |
-|---|--------------|----------------|----------|---------|---------------------|
-| S1 | [Description] | [Source] | P2 | [Section name] | [What it improves] |
-| S2 | [Description] | [Source] | P2/P3 | [Section name] | [What it improves] |
+| # | Revision Item | Origin (issue IDs) | Source Reviewer | Priority | Section | Expected Improvement |
+|---|--------------|-------------------|----------------|----------|---------|---------------------|
+| RM-4 | [Description] | [Issue IDs] | [Source] | P2 | [Section name] | [What it improves] |
+| RM-5 | [Description] | [Issue IDs] | [Source] | P2/P3 | [Section name] | [What it improves] |
 ...
 
 ---
@@ -112,18 +117,18 @@ Requirements:
 ## Revision Roadmap *
 
 ### Priority 1 — Structural Revisions (Estimated total effort: X days)
-- [ ] R1: [Task description — linked to Required Revisions above]
-- [ ] R2: [Task description]
-- [ ] R3: [Task description]
+- [ ] RM-1: [Task description — linked to Required Revisions above]
+- [ ] RM-2: [Task description]
+- [ ] RM-3: [Task description]
 
 ### Priority 2 — Content Supplementation (Estimated total effort: X days)
-- [ ] S1: [Task description]
-- [ ] S2: [Task description]
+- [ ] RM-4: [Task description]
+- [ ] RM-5: [Task description]
 
 ### Priority 3 — Text and Formatting (Estimated total effort: X days)
-- [ ] [Merged Minor Issues from all reviewers]
-- [ ] [Language polishing items]
-- [ ] [Citation format corrections]
+- [ ] RM-6: [Merged Minor Issues from all reviewers]
+- [ ] RM-7: [Language polishing items]
+- [ ] RM-8: [Citation format corrections]
 
 ### Total Estimated Effort
 - **Minor Revision**: [X-Y days]
@@ -183,10 +188,11 @@ After careful consideration, we are unable to accept your manuscript for publica
 ### Revision Roadmap Design Principles
 
 1. **Actionability**: Every item is a concrete task, not an abstract suggestion
-2. **Traceability**: Every item can be traced back to specific reviewer comments
-3. **Prioritization**: Priority 1 > 2 > 3; authors can process in order
-4. **Time estimation**: Helps authors plan their revision timeline
-5. **Compatibility**: Format can be directly used as `academic-paper` revision mode input
+2. **Traceability**: Every item carries its `origin` issue ID(s) back to specific reviewer comments; re-review joins on that ID, not on wording or row order
+3. **ID immutability**: Roadmap IDs (`RM-<NN>`) and issue IDs are minted once. Reordering the roadmap does not renumber it, and a Roadmap ID is never reused for a different item
+4. **Prioritization**: Priority 1 > 2 > 3; authors can process in order
+5. **Time estimation**: Helps authors plan their revision timeline
+6. **Compatibility**: Format can be directly used as `paper` 模块 revision mode input, which consumes it as the Stage A issue set (`../references/issue_lifecycle_protocol.md`)
 
 ### Severity-to-Priority Mapping
 

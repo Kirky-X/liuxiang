@@ -2,6 +2,8 @@
 
 This document defines universal criteria for academic paper review and type-specific criteria differentiated by paper type. All reviewer agents share this framework.
 
+**Scope boundary.** This framework scores *scientific merit*. Manuscript craft — whether the paper is built, written, and packaged so a reader can use it — is covered separately by the 30 enumerable criteria in [`craft_criteria_checklist.md`](craft_criteria_checklist.md) (ARC / PRO / MTH / FIG / CIT / PRC). Both are required; neither substitutes for the other. Issues raised against a craft criterion carry their ID and are tracked per [`issue_lifecycle_protocol.md`](issue_lifecycle_protocol.md).
+
 ---
 
 ## 1. Universal Review Dimensions

@@ -40,6 +40,16 @@ Priority 3 (Nice to Fix):
   -> Check but does not affect Decision
 ```
 
+### Issue ID Continuity (join key)
+
+⚠️ **Re-review walks issue IDs, not the manuscript.** Every item above carries a stable issue ID from Stage D (`<SOURCE>-<NN>`, e.g. `R2-3`, `DA-1`) per [`issue_lifecycle_protocol.md`](issue_lifecycle_protocol.md) §2. That ID — not the Roadmap row order, not the issue wording — is the join key between the diagnosis and this verification.
+
+1. **Reuse, never re-mint.** A carried-forward issue is verified under its original ID. Re-minting an ID at re-review severs the chain and turns verification into a fresh opinion.
+2. **Verify the disposition, not the claim.** For each ID, read the disposition recorded in the Revision Tracking Table (`RESOLVED` / `PARTIAL` / `DELIBERATE_LIMITATION` / `UNRESOLVABLE` / `REVIEWER_DISAGREE` / `REJECTED_AS_INVALID` / `OPEN`), navigate to the recorded location, and verify independently. A disposition with no recorded location is unverifiable — mark `🔍 Cannot verify` and flag in Quality Assessment.
+3. **Missing disposition is a finding.** An issue ID present in the round-1 set and absent from the round-2 tracking table is reported as a missing disposition. This is the failure mode by which a revision round quietly loses an issue, so it is reported explicitly rather than skipped.
+4. **New defects get new IDs.** Anything discovered fresh in this round is minted under the reusing panelist's prefix as a round-2 ID, and is reported as a new issue — never folded into the verification of an existing one.
+5. **Criterion re-check.** Where a criterion ID (`ARC-02`, `PRO-05`, … from [`craft_criteria_checklist.md`](craft_criteria_checklist.md)) was recorded on a carried-forward issue, note whether the fix held or the same criterion failed elsewhere. A repeated failure under the same criterion is a systemic finding, not a one-off, and belongs in the Decision Letter.
+
 ### Commitment Ledger Verification (Kong A1 / v3.11)
 
 This step runs **for every Schema 11 row** (any priority) that carries a non-empty `commitment_extracted` list from `revision_coach_agent` Step 3.5. It is independent of the Priority 1/2/3 Traceability Rule above — every parsed reviewer comment may produce commitments, and every commitment must be verified, regardless of the parent concern's priority.
@@ -68,6 +78,8 @@ In addition to checking old items, EIC also scans for:
 - Whether newly added references are correct (but deep verification is left to Stage 4.5 integrity check)
 - Whether revisions cause inconsistencies
 ```
+
+Each new finding is minted as a fresh round-2 issue ID (see Issue ID Continuity rule 4) and carries the criterion ID it was raised against, so a criterion that fails in both rounds is visible as a pattern rather than two coincidences.
 
 ### Socratic Guidance After Re-Review
 

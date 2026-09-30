@@ -8,6 +8,8 @@ This template works with both:
 - **Revision mode** (`revision` in SKILL.md): when you have a draft and structured reviewer feedback
 - **Revision Coach mode** (`revision-coach` in SKILL.md): when you have unstructured reviewer comments that need parsing first
 
+**`concern_id` is the join key.** It carries the stable issue ID the diagnosis stage minted (`<SOURCE>-<NN>`, e.g. `R2-3`, `DA-1`) and is what re-review verifies against. Keep it byte-identical to the ID in the peer review report and the Revision Roadmap — do not renumber, re-word, or reuse it. When the Roadmap was the entry point, also record `roadmap_id: RM-7` on the concern. Full grammar, disposition set, and merge/split rules: `../references/issue_lifecycle_protocol.md`.
+
 ---
 
 ## Paper Information
@@ -33,6 +35,8 @@ This template works with both:
 | 3 | [description] | [R1/R2/R3/DA] | [Major/Minor/Editorial] | [section] | [what was done] | [page/paragraph] | [status] | [if applicable] | _(empty — positive comment, no commitment)_ |
 
 **Per-row Commitment Ledger (nested-object shape, #268).** Each concern's commitments are authored as a single nested YAML block keyed by `concern_id` — one object per commitment, with `fulfillment_status` / `unfulfilled_rationale` nested **inside** the object. There are no separate parallel cells to keep aligned, so a dropped separator or mis-numbering can no longer desynchronize status from commitment.
+
+Commitments inherit the concern's ID as a suffix — `R2-3.1`, `R2-3.2` — so a multi-commitment concern remains addressable commitment by commitment at re-review.
 
 Placeholders use `<...>` (angle brackets) — replace each with a literal scalar. Do NOT use `[...]`: inside a YAML block square brackets parse as a flow sequence, so a half-filled `[R1-1]` becomes a one-element list, not the string `R1-1`. (The only real list here is `commitment_extracted: []`, the empty-list marker.)
 
@@ -71,6 +75,12 @@ Change made; reviewer concern fully addressed.
 - **Must include**: brief description of what was changed
 - **Example**: "Added three additional references supporting the methodology choice (Section 3.2, paragraph 2)"
 
+### PARTIAL
+Partially addressed; the remainder was declined or found infeasible.
+- **Must specify**: what was done and what was not
+- **Must include**: the reason the remainder was not done
+- **Example**: "Added the sensitivity analysis for the primary model (Section 3.4); the robustness check on the secondary model was not run because the preprocessed data is no longer available. Recorded in Limitations."
+
 ### DELIBERATE_LIMITATION
 Acknowledged as a boundary condition of the study design (not a flaw).
 - **Must provide**: justification for why this is a design boundary, not an oversight
@@ -88,6 +98,18 @@ Respectful disagreement with the reviewer's suggestion on methodological or theo
 - **Must provide**: evidence-based rebuttal with citations
 - **Must demonstrate**: that the reviewer's concern was carefully considered
 - **Example**: "We respectfully maintain our analytical approach. Smith (2022) and Chen (2023) both validate this method for our sample size and data structure. Response letter includes detailed justification."
+
+### REJECTED_AS_INVALID
+The reviewer's *finding* does not hold — distinct from `REVIEWER_DISAGREE`, which accepts the finding and disputes the remedy.
+- **Must provide**: why the finding itself is wrong, with reference to the manuscript text or a cited source
+- **Must include**: the specific claim being rejected, quoted
+- **Example**: "The concern states that Eq. 4 is dimensionally inconsistent. Eq. 4 operates on the covariance matrix, so its units are already squared; no correction is needed. Response letter explains this with the dimensional analysis."
+- **Why separate:** collapsing this into `REVIEWER_DISAGREE` makes a panel that misread the paper look merely obstinate, and hides a reviewer failure that re-review should be able to see.
+
+### OPEN
+Not yet acted on in this round.
+- **Must include**: nothing else — the state is the information
+- **Round-end rule:** any `OPEN` issue must be reported in the round summary with its count and IDs. An issue that vanishes between rounds is indistinguishable from an issue that was fixed, and an unrecorded drop is the most common way a revision round loses a concern.
 
 ---
 
@@ -172,14 +194,19 @@ Sincerely,
 
 | Metric | Count |
 |--------|-------|
-| Total items | [N] |
+| Total issues in the set | [N] |
 | Resolved | [N] |
+| Partial | [N] |
 | Deliberate Limitation | [N] |
 | Unresolvable | [N] |
 | Reviewer Disagree | [N] |
+| Rejected as Invalid | [N] |
+| **Open at round end** | **[N — list IDs]** |
 | Word count change | [±N words] |
 | New references added | [N] |
 | New figures/tables added | [N] |
+
+⚠️ **The counts must add up.** `Resolved + Partial + Deliberate Limitation + Unresolvable + Reviewer Disagree + Rejected as Invalid + Open = Total issues in the set`. A shortfall is an issue that fell out of the round without a disposition, and it is the single most common silent failure in a revision cycle.
 
 ---
 
@@ -188,11 +215,18 @@ Sincerely,
 Before submitting the revision, verify:
 
 - [ ] Every reviewer comment has a corresponding row in the tracking table
+- [ ] Every `concern_id` matches the issue ID in the peer review report / Roadmap byte-for-byte
+- [ ] No issue ID was renumbered, re-minted, or reused
+- [ ] Every issue in the set has exactly one disposition; none was dropped
+- [ ] Any `OPEN` item is listed with its ID and carried to the next round
 - [ ] Every RESOLVED item specifies the exact location of the change
+- [ ] Every PARTIAL item states what remains and why
 - [ ] Every DELIBERATE_LIMITATION item is discussed in the Limitations section
 - [ ] Every UNRESOLVABLE item is mentioned in Future Research
 - [ ] Every REVIEWER_DISAGREE item has an evidence-based rebuttal
-- [ ] The response letter addresses all comments in order
+- [ ] Every REJECTED_AS_INVALID item quotes the claim it rejects and explains why it does not hold
+- [ ] No edit in the revised draft lacks an originating issue ID
+- [ ] The response letter addresses all comments in order, keyed by the same issue IDs
 - [ ] Word count is within the journal's limit after revisions
 - [ ] All new references are added to the reference list
 - [ ] No new errors were introduced during revision (re-run citation check)

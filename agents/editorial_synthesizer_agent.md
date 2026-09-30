@@ -177,7 +177,15 @@ Based on the decision matrix in `../references/editorial_decision_standards.md`:
 
 ### Step 5: Revision Roadmap Construction
 
-Organize all items requiring revision into an executable checklist by priority:
+Organize all items requiring revision into an executable checklist by priority. **Every item keeps the stable issue ID(s) it was minted with in Phase 1** — the Roadmap reorders existing issues, it never renumbers or re-describes them. Rules in `../references/issue_lifecycle_protocol.md` §4–§5.
+
+Before building the Roadmap, run the **Consistency Pass** (`../references/issue_lifecycle_protocol.md` §6):
+
+1. Merge issues describing the same defect. The survivor keeps the ID of the source earliest in panel order (`EIC` → `R1` → `R2` → `R3` → `DA`); absorbed IDs are recorded as `merged-from`; severity is the highest reported; criterion IDs are the union.
+2. Reconcile the 5 craft-criteria coverage blocks (`../references/craft_criteria_checklist.md`). A criterion no panelist checked and no panelist justified is a **stated limitation of this review**, written into the Decision Letter — not a silent gap.
+3. Normalise severity where panelists disagree on the same defect, and record the disagreement rather than flattening it.
+
+Roadmap rows are numbered `RM-<NN>` with an `origin` column of issue IDs. Do not number them `R1`/`R2`/`R3` — those are panel labels and collide inside the same document.
 
 **Priority 1 — Structural Revisions (Must Fix)**
 - Issues affecting the paper's core arguments or conclusions
@@ -212,8 +220,8 @@ Thank you for submitting your manuscript titled "[Paper Title]" to [Journal Name
 ### Consensus Analysis
 
 #### Points of Agreement (Consensus)
-- [CONSENSUS-4] [Consensus content]
-- [CONSENSUS-3] [Consensus content]
+- [CONSENSUS-4] (issue IDs: R1-4, R2-7, DA-2) [Consensus content]
+- [CONSENSUS-3] (issue IDs: ...) [Consensus content]
 ...
 
 #### Points of Disagreement
@@ -234,33 +242,33 @@ Thank you for submitting your manuscript titled "[Paper Title]" to [Journal Name
 
 ### Required Revisions (Must Fix)
 
-| # | Revision Item | Source | Priority | Estimated Effort |
-|---|--------------|--------|----------|-----------------|
-| R1 | [Description] | [EIC/R1/R2/R3] | P1 | [Time] |
-| R2 | [Description] | [Source] | P1 | [Time] |
+| # | Revision Item | Origin (issue IDs) | Source | Priority | Estimated Effort |
+|---|--------------|-------------------|--------|----------|-----------------|
+| RM-1 | [Description] | [R2-3, DA-1] | [EIC/R1/R2/R3/DA] | P1 | [Time] |
+| RM-2 | [Description] | [Issue IDs] | [Source] | P1 | [Time] |
 ...
 
 ### Suggested Revisions (Should Fix)
 
-| # | Revision Item | Source | Priority | Estimated Effort |
-|---|--------------|--------|----------|-----------------|
-| S1 | [Description] | [Source] | P2 | [Time] |
-| S2 | [Description] | [Source] | P2/P3 | [Time] |
+| # | Revision Item | Origin (issue IDs) | Source | Priority | Estimated Effort |
+|---|--------------|-------------------|--------|----------|-----------------|
+| RM-3 | [Description] | [Issue IDs] | [Source] | P2 | [Time] |
+| RM-4 | [Description] | [Issue IDs] | [Source] | P2/P3 | [Time] |
 ...
 
 ### Revision Checklist (Checkable List)
 
 #### Priority 1 — Structural Revisions (Estimated total effort: X days)
-- [ ] R1: [Task description]
-- [ ] R2: [Task description]
+- [ ] RM-1: [Task description]
+- [ ] RM-2: [Task description]
 
 #### Priority 2 — Content Supplementation (Estimated total effort: X days)
-- [ ] S1: [Task description]
-- [ ] S2: [Task description]
+- [ ] RM-3: [Task description]
+- [ ] RM-4: [Task description]
 
 #### Priority 3 — Text and Formatting (Estimated total effort: X days)
-- [ ] [Task description]
-- [ ] [Task description]
+- [ ] RM-5: [Task description]
+- [ ] RM-6: [Task description]
 
 ### Revision Deadline
 [Minor: Recommended 2-4 weeks / Major: Recommended 6-8 weeks]
@@ -297,9 +305,11 @@ Thank you for submitting your manuscript titled "[Paper Title]" to [Journal Name
 - [ ] Both Consensus and Disagreement have been identified and labeled
 - [ ] Every Disagreement has an arbitration result and rationale
 - [ ] Decision is consistent with reviewer opinions (cannot say Reject when everyone says Accept)
-- [ ] Every item in the Revision Roadmap is traceable to specific reviewer comments
+- [ ] Every item in the Revision Roadmap is traceable to specific reviewer comments via its `origin` issue ID(s)
+- [ ] No issue ID was renumbered, re-minted, or reused; merged issues record `merged-from`
+- [ ] The 5 craft-criteria coverage blocks were reconciled; any unexplained panel gap is stated as a limitation of this review
 - [ ] No self-fabricated issues that reviewers didn't mention
-- [ ] Revision Roadmap format is compatible with `academic-paper` revision mode input format
+- [ ] Revision Roadmap format is compatible with `paper` 模块 revision mode input format (Stage A issue set)
 - [ ] Tone is professional and impartial, not favoring any particular reviewer
 
 ---

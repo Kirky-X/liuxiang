@@ -10,6 +10,8 @@ This template is used by all reviewer agents (EIC, Reviewers 1-3). Each reviewer
 2. Each reviewer must fully complete all required fields (items marked with *)
 3. Detailed Comments are section-by-section commentary; only comment on sections relevant to your review focus
 4. Language follows the paper's language (Chinese papers reviewed in Chinese, English papers in English)
+5. Every weakness and minor issue is minted a stable `Issue ID` (`<SOURCE>-<NN>`, where `<SOURCE>` is your panel slot: `EIC` / `R1` / `R2` / `R3` / `DA`) and names the craft criterion it was raised against. `W1…W5` are presentation numbering; the `Issue ID` is the durable handle that follows the issue into the Revision Roadmap, the Revision Tracking Table, and re-review — see `../references/issue_lifecycle_protocol.md`
+6. The report ends with the Craft Criteria Coverage block (`../references/craft_criteria_checklist.md` § Coverage Attestation). Walk the criteria you own; mark the rest N/A or not-checked with a reason. Do not report replacement text for a defect — report the defect and the direction of a fix
 
 ---
 
@@ -97,26 +99,33 @@ List 3-5 strengths of the paper. Each must:
 
 List 3-5 weaknesses of the paper. Each must:
 - Have a specific title
+- Carry a stable `Issue ID` and the `Criterion` it violates
 - Describe the specific problem
 - Explain why it is a problem
-- Provide specific improvement suggestions
+- Provide the direction of an improvement (not replacement text — see `../references/issue_lifecycle_protocol.md` §1)
 
 ### W1: [Weakness title] *
+**Issue ID**: [EIC-1 / R1-1 / R2-1 / R3-1 / DA-1]
+**Criterion**: [e.g. ARC-06, MTH-03 — or "n/a (merit dimension)"]
 **Problem**: [Specific description of the problem, citing paper passages]
 **Why it matters**: [Explain the impact of this problem]
-**Suggestion**: [Specific improvement direction]
+**Suggested direction**: [What the fix needs to accomplish, not the finished sentence]
 **Severity**: [Critical / Major / Minor]
 
 ### W2: [Weakness title] *
+**Issue ID**: [...]
+**Criterion**: [...]
 **Problem**: [...]
 **Why it matters**: [...]
-**Suggestion**: [...]
+**Suggested direction**: [...]
 **Severity**: [Critical / Major / Minor]
 
 ### W3: [Weakness title] *
+**Issue ID**: [...]
+**Criterion**: [...]
 **Problem**: [...]
 **Why it matters**: [...]
-**Suggestion**: [...]
+**Suggested direction**: [...]
 **Severity**: [Critical / Major / Minor]
 
 ### W4: [Weakness title]
@@ -188,22 +197,22 @@ List 2-4 questions requiring author response. These questions should:
 
 ## Minor Issues
 
-List minor issues that don't affect academic quality but need correction.
+List minor issues that don't affect academic quality but need correction. Each item carries an `Issue ID` and, where it maps to one, a `Criterion` — minor issues are tracked like any other, because most of what blocks acceptance is filed here.
 
 ### Language / Grammar
-- [Page X, Line Y: Specific language issue]
+- [ID: EIC-4] [Criterion: PRO-01] [Page X, Line Y: Specific language issue]
 - [...]
 
 ### Citation Format
-- [Specific citation format issues]
+- [ID: ...] [Criterion: CIT-03] [Specific citation format issues]
 - [...]
 
 ### Figures and Tables
-- [Figure/table improvement suggestions]
+- [ID: ...] [Criterion: FIG-02] [Figure/table improvement suggestions]
 - [...]
 
 ### Layout
-- [Layout issues]
+- [ID: ...] [Criterion: ...] [Layout issues]
 - [...]
 
 ---
@@ -222,6 +231,23 @@ Score each dimension 0-100 using the rubrics in `../references/quality_rubrics.m
 | Literature Integration (optional) | | [See rubrics] | R2 focus |
 | Significance & Impact (optional) | | [See rubrics] | R3 focus |
 | **Weighted Average** | | **[Accept/Minor/Major/Reject]** | |
+
+---
+
+## Craft Criteria Coverage *
+
+Walk the craft criteria you own and report the result. Criteria that do not apply to this manuscript are marked N/A with a reason; criteria outside your ownership are left to their owner. Never leave a category silent — the synthesizer reads this block to detect panel gaps, and silence is read as an unchecked gap. Full format and per-mode subsets: `../references/craft_criteria_checklist.md`.
+
+| Category | Checked | Not checked (reason) |
+|----------|---------|----------------------|
+| ARC (7) | [ARC-01, ARC-02, ...] | [—] |
+| PRO (7) | [...] | [...] |
+| MTH (4) | [...] | [N/A: non-quantitative manuscript] |
+| FIG (5) | [...] | [...] |
+| CIT (4) | [...] | [...] |
+| PRC (3) | [...] | [...] |
+
+Clean: [N]/30 checked, [N] N/A, [N] not applicable this round
 ```
 
 ---

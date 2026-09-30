@@ -132,6 +132,8 @@ User: "Review this paper"
          - Identifies consensus (5 agree) vs. disagreement (divergent opinions)
          - Arbitration and argumentation for disputed issues
          - Devil's Advocate CRITICAL issues are specially flagged in the Editorial Decision
+         - Merges duplicate issues across panelists, preserving the surviving issue ID; runs the Consistency Pass (`../references/issue_lifecycle_protocol.md` §6)
+         - Reconciles the 5 craft-criteria coverage blocks; an unexplained panel gap is stated as a limitation of this review
          - Editorial Decision Letter
          - Revision Roadmap (prioritized, can be directly input to paper 模块 revision mode)
      |
@@ -161,6 +163,9 @@ User: "Review this paper"
 4. ⚠️ **IRON RULE**: If the Devil's Advocate finds CRITICAL issues, the Editorial Decision cannot be Accept.
 5. **Phase 2.5**: Revision Coaching only triggers when Decision is not Accept; user can choose to skip
 6. ⚠️ **IRON RULE — READ-ONLY CONSTRAINT**: Reviewers MUST NOT modify the submitted manuscript. All review output (reports, decisions, roadmaps) is produced as separate documents. The reviewer examines the paper — it never rewrites it. If a reviewer agent attempts to edit the manuscript file, STOP and redirect to report generation.
+7. ⚠️ **IRON RULE — STAGE D IS DIAGNOSE-ONLY**: Review is the diagnose stage of a two-stage loop (diagnose → act). Beyond the read-only constraint of Rule #6, a reviewer reports defects and the direction of a fix; it never supplies the replacement text. Diagnosis and revision never run in the same pass — the separation is what makes the round's diff auditable. Full rules in `../references/issue_lifecycle_protocol.md`.
+8. ⚠️ **IRON RULE — CRAFT CRITERIA ARE MANDATORY**: Every Phase 1 report ends with a Criteria Coverage block walking the craft criteria that panelist owns (per `../references/craft_criteria_checklist.md`). A criterion that does not apply is marked N/A with a reason; a criterion that was not walked is marked with a reason. Silence is read by the synthesizer as a gap. Clean criteria produce no issue — the coverage block, not the issue list, is what proves the checklist was walked.
+9. ⚠️ **IRON RULE — EVERY ISSUE CARRIES AN ID**: Each weakness, minor issue, and Devil's Advocate finding is minted a stable ID (`<SOURCE>-<NN>`, e.g. `R2-3`, `DA-1`) plus the criterion ID it was raised against. IDs are minted once, never renumbered, never recycled. Grammar, merge/split rules, and the five-artifact ID chain in `../references/issue_lifecycle_protocol.md`.
 
 ---
 
@@ -246,12 +251,34 @@ Opt-in mode that measures this reviewer's FNR / FPR / balanced accuracy against 
 
 Each reviewer's report structure is detailed in `../templates/peer_review_report_template.md`.
 
+### Issue IDs (required)
+
+Every weakness, minor issue, and Devil's Advocate finding is minted a stable ID at report time, in the format `<SOURCE>-<NN>` where `<SOURCE>` is the raising panelist (`EIC` / `R1` / `R2` / `R3` / `DA`) and `<NN>` is a two-digit per-panelist sequence. Each issue also names the craft criterion it was raised against (`ARC-02`, `PRO-05`, …).
+
+```
+### W2: Section 3.2 opens on the model equation before stating its purpose
+- **Issue ID**: R2-3
+- **Criterion**: ARC-02 (claim precedes apparatus)
+- **Problem**: The subsection begins with Eq. 7 and defers its purpose to the third paragraph...
+- **Why it matters**: ...
+- **Suggested direction**: State the purpose in the opening sentence, then introduce Eq. 7...
+- **Severity**: Major
+```
+
+The `W1…W5` labels remain as presentation numbering within a report; the `Issue ID` is the durable handle that survives into the Revision Roadmap, the Revision Tracking Table, and re-review. Full grammar, merge/split rules, and the ID chain across all five artifacts: `../references/issue_lifecycle_protocol.md`.
+
+### Craft Criteria Coverage (required)
+
+Each report ends with a coverage block proving which craft criteria that panelist walked, which did not apply, and why. Panel coverage across all six categories is a Phase 2 precondition; an unexplained panel gap is escalated by `editorial_synthesizer_agent` as a review limitation in the Decision Letter.
+
+> See `../references/craft_criteria_checklist.md` for the 30 criteria, their owners, the coverage block format, and the reduced sets used by `quick` / `methodology-focus` / `re-review` / `guided`.
+
 ### Devil's Advocate Report Structure (Special Format)
 
 The Devil's Advocate uses a dedicated format, not the standard reviewer template:
 
 - **Strongest Counter-Argument** (200-300 words)
-- **Issue List** (categorized as CRITICAL / MAJOR / MINOR, with dimension and location)
+- **Issue List** (categorized as CRITICAL / MAJOR / MINOR, with dimension and location; each row carries an `Issue ID` under the `DA-` prefix and the criterion ID it was raised against)
 - **Ignored Alternative Explanations/Paths**
 - **Missing Stakeholder Perspectives**
 - **Observations (Non-Defects)**
@@ -307,6 +334,8 @@ search 模块 --> paper 模块 --> [integrity check] --> reviewer 模块 --> pap
 | Reference                                       | Purpose                                                                                                                                                 | Used By                    |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `../references/review_criteria_framework.md`       | Structured review criteria framework (differentiated by paper type)                                                                                     | all reviewers              |
+| `../references/craft_criteria_checklist.md`        | 30 enumerable manuscript-craft criteria in 6 categories (ARC / PRO / MTH / FIG / CIT / PRC), owner mapping, coverage attestation block, per-mode subsets        | all reviewers              |
+| `../references/issue_lifecycle_protocol.md`        | Stable issue ID grammar, diagnose→act separation rules, dispositions, merge/split rules, the five-artifact ID chain                                        | all reviewers, synthesizer |
 | `../references/top_journals_by_field.md`           | Top journal lists for major academic fields (EIC role calibration)                                                                                      | field_analyst, eic         |
 | `../references/editorial_decision_standards.md`    | Accept/Minor/Major/Reject criteria and decision matrix                                                                                                  | eic, editorial_synthesizer |
 | `../references/statistical_reporting_standards.md` | Statistical reporting standards + APA 7.0 format quick reference + red flag list                                                                        | methodology_reviewer       |
@@ -352,6 +381,8 @@ Explicit prohibitions to prevent common failure modes, especially during long co
 | 5   | **Sycophantic score inflation**                 | Giving 8/10 to mediocre work to avoid conflict                     | Scores must be evidence-based; a paper with methodology gaps cannot score >6 on rigor |
 | 6   | **Editing the manuscript**                      | Reviewer "helpfully" fixes the paper directly                      | READ-ONLY: produce reports, never modify the paper (Checkpoint Rule #6)               |
 | 7   | **Generic feedback**                            | "The methodology could be stronger" without specifics              | Every criticism must include: what's wrong, where it is, and a proposed fix           |
+| 8   | **Diagnosing and editing in one pass**          | The reviewer rewrites the passage it just criticised               | Report the defect and the direction of a fix; editing is the revision stage's job (Checkpoint Rule #7) |
+| 9   | **Silent criterion skipping**                   | A category is not walked and nothing says so — the gap is invisible | Emit a coverage block; mark N/A or not-checked with a reason (Checkpoint Rule #8)     |
 
 ---
 
@@ -367,6 +398,8 @@ Explicit prohibitions to prevent common failure modes, especially during long co
 | Actionability                     | Each weakness must include specific improvement suggestions                                     |
 | Format consistency                | All reports must follow the template structure; no freestyle                                    |
 | **Devil's Advocate completeness** | **Devil's Advocate must produce the strongest counter-argument; cannot be omitted**             |
+| **Craft coverage**                 | Every report walks its owned craft criteria and reports a coverage block; no silent skips      |
+| **Issue traceability**             | Every issue carries a stable ID (`<SOURCE>-<NN>`) and criterion ID, reusable at re-review      |
 | **CRITICAL threshold**            | **⚠️ IRON RULE: Devil's Advocate CRITICAL issues cannot be ignored by the Editorial Decision**  |
 
 ---

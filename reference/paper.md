@@ -128,6 +128,38 @@ Phase 7: FORMAT        -> [formatter]                  -> Final Output Package
 3. ⚠️ **IRON RULE**: Max 2 revision loops; unresolved items -> "Acknowledged Limitations"
 4. **Peer Review** Critical-severity issues block progression to Phase 7
 5. User can skip Phase 1 (literature) if providing own sources
+6. ⚠️ **IRON RULE — DIAGNOSE AND ACT NEVER SHARE A PASS**: When this module revises against reviewer feedback, it runs as Stage A (act) of a two-stage loop and consumes an issue set produced by Stage D (diagnose). It may not invent criticisms no reviewer made, and it may not mint new issue IDs — every edit traces to an ID that already exists. The mirror-image rule on the diagnosis side (reviewers report, never edit) is Checkpoint Rule #6 in [`reviewer.md`](reviewer.md). Full rules, dispositions, and the ID chain: `../references/issue_lifecycle_protocol.md`.
+
+---
+
+## Revision Mode: Diagnose → Act Separation
+
+`revision` and `revision-coach` modes are the **act** half of a two-stage loop. The separation exists because a pass that both criticises a sentence and rewrites it produces a change nobody can audit: the reviewer has already committed to the fix and rationalises the defect away, and the author receives an edit fused to its own justification, with no record of what was wrong.
+
+```
+  STAGE D — DIAGNOSE (reviewer module, read-only)     STAGE A — ACT (paper module, write)
+  ──────────────────────────────────────────────       ──────────────────────────────────────────
+  reads the manuscript, writes nothing                reads the issue set, edits the manuscript
+  mints one ID per defect: R2-3, DA-1, ...            records one disposition per ID
+  quotes the text as it currently stands               mints no new IDs
+  may state the direction of a fix                    scope: the issue, not adjacent improvements
+        └────────────────────── issue set (IDs frozen) ──────────────────────────────┘
+```
+
+**Stage A obligations** (`revision` mode = agents 8→5→6; `revision-coach` mode = agent 12 alone):
+
+1. **Consume, do not originate.** Act on the issue set. A defect noticed mid-revision is raised to the user or recorded against the issue in hand — never silently fixed as an untracked edit.
+2. **No new IDs.** An ID space that grows during the act phase cannot be audited against the diagnosis that justified it.
+3. **One disposition per ID**, from the set in `../templates/revision_tracking_template.md` § Status Values: `RESOLVED` / `PARTIAL` / `DELIBERATE_LIMITATION` / `UNRESOLVABLE` / `REVIEWER_DISAGREE` / `REJECTED_AS_INVALID` / `OPEN`. An ID with no disposition is reported, never dropped.
+4. **Preserve voice.** Improve the existing expression; do not replace the author's argument with a stronger one.
+
+⚠️ **Exception — cosmetic typesetting.** Reference-list style normalisation, hyphenation, and pure typo repair may be applied inline, provided each is recorded as an issue first. They carry no judgment, so requiring a handoff adds cost without adding audit value. Anything involving a wording choice is out of scope for the exception.
+
+> See `../references/issue_lifecycle_protocol.md` for the ID grammar, merge/split rules, and how IDs are consumed at re-review. Craft criteria that a Stage D reviewer checks against are in `../references/craft_criteria_checklist.md`.
+
+### Self-check before drafting (paper side)
+
+The same craft criteria the reviewer module checks on the way in are worth a pass on the way out. `draft_writer_agent` Step 2.7 and the `full` mode final check walk the `ARC` and `PRO` subsets (`../references/craft_criteria_checklist.md` § Mode subsets) as a self-check — an unmet criterion found here is fixed before the manuscript leaves the module, not reported back to the author as a defect in their own draft.
 
 ---
 
@@ -339,7 +371,7 @@ See `../agents/intake_agent.md` for the complete field definitions of the Phase 
 
 **Agent definitions**: `../agents/{agent_name}.md` — one file per agent (12 total, matching Agent Team table above).
 
-**References** (19 files in `../references/`):
+**References** (21 files in `../references/`):
 
 - Citation: `apa7_extended_guide`, `apa7_chinese_citation_guide`, `citation_format_switcher`
 - Writing: `academic_writing_style`, `writing_quality_check`, `writing_judgment_framework`
@@ -348,6 +380,7 @@ See `../agents/intake_agent.md` for the complete field definitions of the Phase 
 - Process: `failure_paths` (12 scenarios), `mode_selection_guide` (10 modes), `plan_mode_protocol`, `workflow_phase_details`
 - Ethics: `credit_authorship_guide` (CRediT 14 roles), `funding_statement_guide`, `statistical_visualization_standards`
 - Disclosure (v3.2): `disclosure_mode_protocol` (venue-specific AI-usage statement generation), `venue_disclosure_policies` (v1 database: ICLR, NeurIPS, Nature, Science, ACL, EMNLP)
+- Revision loop: `craft_criteria_checklist` (30 craft criteria, ARC/PRO/MTH/FIG/CIT/PRC), `issue_lifecycle_protocol` (diagnose→act separation, stable issue IDs)
 - Also: `../references/apa7_extended_guide.md`（基础引用规范，本模块在其上扩展）
 
 **Templates** (14 files in `../templates/`): `imrad`, `literature_review`, `case_study`, `theoretical_paper`, `policy_brief`, `conference_paper`, `bilingual_abstract`, `credit_statement`, `funding_statement`, `revision_tracking`（4 状态类型）, `peer_review_report`, `editorial_decision`, `revision_response`, `pipeline_status`。LaTeX 模板参考见 `../references/latex_template_reference.md`（上游独立 `latex_article_template.tex` ⚠️ 依赖缺失，未随本套件发布）。
@@ -370,6 +403,7 @@ Explicit prohibitions to prevent common failure modes:
 | 6   | **Sycophantic revision**               | Accepting all reviewer feedback without critical evaluation               | Use REVIEWER_DISAGREE status when reviewer is wrong; justify with evidence                                           |
 | 7   | **Scope creep during revision**        | Adding unrequested sections/analyses to "improve" the paper               | Revision addresses reviewer concerns only; new content requires explicit user approval                               |
 | 8   | **Ignoring failure paths**             | Continuing despite desk-reject signals or fatal methodology flaws         | Check `../references/failure_paths.md`; invoke F11 Desk-Reject Recovery when triggered                                  |
+| 9   | **Diagnosing while editing**           | Revising and judging the same sentence in one pass — the change becomes unauditable | Consume the issue set; every edit traces to an existing issue ID; see § Revision Mode above |
 
 ---
 

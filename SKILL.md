@@ -3,6 +3,11 @@ name: liuxiang
 description: >
   学术研究全流程套件。四个模块：search（论文搜索与下载，脚本驱动，默认）、paper（12-agent 论文写作，10 模式，6 论文类型，5 引用格式，双语摘要，LaTeX/DOCX/PDF 输出）、reviewer（7-agent 多视角同行评审，6 模式）、pipeline（端到端 10 阶段流水线：研究→写作→诚信审查→同行评审→修订→定稿）。触发：搜论文/找论文/下载论文/arXiv/DOI/写论文/评审论文/peer review/学术流水线。$ARGUMENTS[0] 选模块，无参默认走 search 模块。
 argument-hint: "[search|paper|reviewer|pipeline] ..."
+metadata:
+  version: "0.1.2"
+  author: "Kirky-X"
+  repo: "https://github.com/Kirky-X/liuxiang"
+  tags: "academic-research, paper-search, paper-download, paper-writing, peer-review, arxiv, semantic-scholar, pdf-to-markdown, literature-review, research-pipeline"
 ---
 
 # 学术研究全流程套件
