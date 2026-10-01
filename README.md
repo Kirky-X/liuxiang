@@ -12,8 +12,8 @@
 
 | 模块 | 功能 | 实测规模 |
 | ---- | ---- | ---- |
-| **search**（默认） | 论文搜索与下载转 Markdown，脚本驱动 | 8 个数据源：Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE，`--source multi` 聚合去重，多源自动降级 |
-| **paper** | 12-agent 论文写作 | 10 种模式（full / plan / outline / revision / abstract / lit-review / format-convert / citation-check / disclosure 等）、6 论文类型、5 引用格式、双语摘要，LaTeX/DOCX/PDF 输出 |
+| **search**（默认） | 论文搜索与下载转 Markdown，脚本驱动 | 9 个数据源：Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE / OpenAIRE，`--source multi` 聚合去重，多源自动降级；ChinaXiv 下载与 OpenCitations 引用图谱 |
+| **paper** | 12-agent 论文写作 | 11 种模式（full / plan / outline / revision / revision-coach / abstract / lit-review / format-convert / citation-check / disclosure / rebuttal-audit）、6 论文类型、5 引用格式、双语摘要，LaTeX/DOCX/PDF 输出 |
 | **reviewer** | 7-agent 多视角同行评审 | 6 种模式（full / re-review / quick / methodology-focus / guided / calibration） |
 | **pipeline** | 端到端 10 阶段流水线 | 研究→写作→诚信审查→评审→修订→定稿，orchestrator 调度 paper/reviewer |
 

@@ -12,8 +12,8 @@ English | [中文](README.md)
 
 | Module | Description | Measured scale |
 | ------ | ----------- | -------------- |
-| **search** (default) | Paper search & download to Markdown, script-driven | 8 sources: Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE; `--source multi` aggregates with dedup; automatic multi-source fallback |
-| **paper** | 12-agent paper writing | 10 modes (full / plan / outline / revision / abstract / lit-review / format-convert / citation-check / disclosure, etc.), 6 paper types, 5 citation formats, bilingual abstract, LaTeX/DOCX/PDF output |
+| **search** (default) | Paper search & download to Markdown, script-driven | 9 sources: Semantic Scholar / OpenAlex / arXiv / DBLP / Europe PMC / Crossref / PubMed / CORE / OpenAIRE; `--source multi` aggregates with dedup; automatic multi-source fallback; ChinaXiv download & OpenCitations citation graph |
+| **paper** | 12-agent paper writing | 11 modes (full / plan / outline / revision / revision-coach / abstract / lit-review / format-convert / citation-check / disclosure / rebuttal-audit), 6 paper types, 5 citation formats, bilingual abstract, LaTeX/DOCX/PDF output |
 | **reviewer** | 7-agent multi-perspective peer review | 6 modes (full / re-review / quick / methodology-focus / guided / calibration) |
 | **pipeline** | End-to-end 10-stage pipeline | research → writing → integrity review → review → revision → finalization; an orchestrator drives paper/reviewer |
 
