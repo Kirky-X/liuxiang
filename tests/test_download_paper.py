@@ -276,6 +276,119 @@ class TestOfflineShortCircuits(unittest.TestCase):
             self.assertIsNone(dp.fetch_unpaywall_pdf("10.1/x"))
 
 
+CHINAXIV_PAGE = """
+<html><head><title>ChinaXiv.org 中国科学院科技论文预发布平台</title></head><body>
+<a style="color:blue;margin-left:45px;" href="http://dx.doi.org/10.12074/202410.00098">
+<font color="blue">DOI:10.12074/202410.00098</font></a>
+<span> 葛枭语.所谓影响关系有待商榷：对温忠麟等人（2024）的评论.中国科学院科技论文预发布平台.[DOI:10.12074/202410.00098]</span>
+<div><b>摘要: </b>温忠麟等人（2024）在《心理学报》发文聚焦长期以来用法模糊的“影响”一词。
+</div>
+<a href="/user/download.htm?uuid=74c68db5-af96-4d4e-8c41-45b94159cfbe">附件</a>
+<a href="/user/download.htm?uuid=daf9c3c1-e67a-45aa-b5a7-20c953d98670&filetype=bib">BibTeX</a>
+<a href="/user/download.htm?uuid=daf9c3c1-e67a-45aa-b5a7-20c953d98670&filetype=pdf">PDF</a>
+<a href="/user/download.htm?uuid=daf9c3c1-e67a-45aa-b5a7-20c953d98670&filetype=zip">源码</a>
+</body></html>
+"""
+
+
+class FakeChinaXivResp:
+    def __init__(self, status_code=200, text=""):
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.exceptions.HTTPError(f"HTTP {self.status_code}")
+
+
+class TestChinaXiv(unittest.TestCase):
+    def test_id_regex(self):
+        self.assertTrue(dp.CHINAXIV_ID_RE.match("202410.00098"))
+        self.assertTrue(dp.CHINAXIV_ID_RE.match("chinaxiv:202410.00098v2"))
+        self.assertTrue(dp.CHINAXIV_ID_RE.match("202010.0001V3"))
+        # arXiv 是 4 位月前缀，不得与 ChinaXiv 的 6 位年月前缀混淆
+        self.assertFalse(dp.CHINAXIV_ID_RE.match("2306.12345"))
+        self.assertFalse(dp.CHINAXIV_ID_RE.match("not-an-id"))
+
+    def test_url_regex(self):
+        m = dp.CHINAXIV_URL_RE.match("https://chinaxiv.org/abs/202410.00098v2")
+        self.assertEqual(m.group(1), "202410.00098v2")
+        m = dp.CHINAXIV_URL_RE.match("http://www.chinaxiv.org/abs/202010.0001")
+        self.assertEqual(m.group(1), "202010.0001")
+        self.assertFalse(dp.CHINAXIV_URL_RE.match("https://arxiv.org/abs/2306.12345"))
+
+    def test_page_parses_metadata_and_pdf_uuid(self):
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=CHINAXIV_PAGE)):
+            meta, pdf_url = dp.resolve_chinaxiv("202410.00098")
+        self.assertEqual(meta["title"], "所谓影响关系有待商榷：对温忠麟等人（2024）的评论")
+        self.assertEqual(meta["authors"], ["葛枭语"])
+        self.assertEqual(meta["doi"], "10.12074/202410.00098")
+        self.assertIn("温忠麟等人（2024）", meta["abstract"])
+        self.assertEqual(meta["venue"], "ChinaXiv（中科院预印本）")
+        self.assertEqual(
+            pdf_url,
+            f"{dp.CHINAXIV_BASE_URL}/user/download.htm"
+            "?uuid=daf9c3c1-e67a-45aa-b5a7-20c953d98670&filetype=pdf",
+        )
+
+    def test_page_without_pdf_link_raises(self):
+        page = CHINAXIV_PAGE.replace("&filetype=pdf", "")
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=page)):
+            with self.assertRaisesRegex(RuntimeError, "未挂载可下载的全文 PDF"):
+                dp.resolve_metadata("202410.00098")
+
+    def test_doi_prefix_routes_to_chinaxiv(self):
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=CHINAXIV_PAGE)) as g:
+            meta, pdf_url, arxiv_id = dp.resolve_metadata("10.12074/202410.00098")
+        self.assertIsNone(arxiv_id)
+        self.assertEqual(meta["doi"], "10.12074/202410.00098")
+        # abs 页面请求只发一次（DOI → ID 复用同一解析链）
+        self.assertIn("/abs/202410.00098", g.call_args[0][0])
+
+    def test_abs_url_routes_to_chinaxiv(self):
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=CHINAXIV_PAGE)):
+            meta, pdf_url, arxiv_id = dp.resolve_metadata("https://chinaxiv.org/abs/202410.00098")
+        self.assertIsNone(arxiv_id)
+        self.assertTrue(pdf_url.endswith("&filetype=pdf"))
+
+    def test_download_403_maintenance_raises_explicitly(self):
+        maintenance = FakeChinaXivResp(status_code=403, text="<html><title>系统正在维护中</title></html>")
+        with mock.patch.object(dp, "_get_with_retry", return_value=maintenance):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                dp.download_pdf(f"{dp.CHINAXIV_BASE_URL}/user/download.htm?uuid=x&filetype=pdf")
+
+    def test_page_without_cite_string_is_linear_not_catastrophic(self):
+        # 性能审查 C-1 回归：站改版/维护页导致的失配场景，大页面必须快速失败而非组合回溯
+        big = "<html><body>" + "<p>关键词.更多词.段落内容</p>" * 400 + "</body></html>"  # ~100KB 单行
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=big)):
+            import time
+            start = time.monotonic()
+            with self.assertRaises(RuntimeError):
+                dp.resolve_chinaxiv("202410.00098")
+            self.assertLess(time.monotonic() - start, 5.0, "引用串失配出现组合级回溯（C-1 回归）")
+
+    def test_no_fulltext_error_carries_metadata_and_abstract(self):
+        # 架构审查 M3 回归：无全文时错误消息必须带上标题/摘要（ChinaXiv 无检索 API，摘要拿不到第二次）
+        page = CHINAXIV_PAGE.replace("&filetype=pdf", "")
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(text=page)):
+            with self.assertRaisesRegex(RuntimeError, "所谓影响关系有待商榷"):
+                dp.resolve_chinaxiv("202410.00098")
+
+    def test_403_error_message_strips_ansi_escapes(self):
+        # 安全审查 S4 回归：响应体中的 ANSI 转义序列不得进入终端输出
+        evil = FakeChinaXivResp(status_code=403, text="<div>\x1b[31m系统正在维护\x1b[0m</div>")
+        with mock.patch.object(dp, "_get_with_retry", return_value=evil):
+            with self.assertRaises(RuntimeError) as cm:
+                dp.download_pdf(f"{dp.CHINAXIV_BASE_URL}/user/download.htm?uuid=x&filetype=pdf")
+            self.assertNotIn("\x1b", str(cm.exception))
+
+    def test_http_error_page_raises(self):
+        with mock.patch.object(dp, "_get_with_retry", return_value=FakeChinaXivResp(status_code=404, text="")):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 404"):
+                dp.resolve_chinaxiv("199999.99999")
+
+
 class TestCliSmoke(unittest.TestCase):
     def test_help(self):
         r = subprocess.run(
