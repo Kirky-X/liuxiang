@@ -7,7 +7,8 @@ search_papers.py — 学术论文搜索（接口一）
 主搜索源：Semantic Scholar（覆盖期刊+预印本，免费，无需 API Key）
 兜底搜索源：arXiv（当 Semantic Scholar 请求失败/超限/无结果时自动切换，仅覆盖预印本）
 其他可用源：OpenAlex（开放学术图谱）、Crossref（DOI 元数据）、PubMed（生物医学）、
-            DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）
+            DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）、
+            OpenAIRE（欧洲仓储聚合，Graph API v3）
 
 用法：
     python search_papers.py "quantum computing" --limit 10
@@ -54,6 +55,9 @@ EUROPEPMC_API_URL = os.environ.get("EUROPEPMC_API_URL", "https://www.ebi.ac.uk/e
 # 未设置 CORE_API_KEY 时 CORE 源自动跳过。
 CORE_API_URL = os.environ.get("CORE_API_URL", "https://api.core.ac.uk/v3/search/works")
 CORE_API_KEY = os.environ.get("CORE_API_KEY", "")
+# OpenAIRE Graph API v3（旧 XML Search API 已于 2026-05-31 停用，勿用 api.openaire.eu/search）。
+# 免费无 Key，欧洲仓储聚合（OpenAIRE Graph），覆盖欧洲机构库与 OA 位置。
+OPENAIRE_API_URL = os.environ.get("OPENAIRE_API_URL", "https://api.openaire.eu/graph/v3/research-products")
 
 # 瞬时错误（限流/网络抖动）重试次数与间隔。429/5xx 才重试，4xx（除429）直接放弃。
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
@@ -504,12 +508,84 @@ def search_core(query: str, limit: int, mode: str):
     return results
 
 
+def search_openaire(query: str, limit: int, mode: str):
+    """OpenAIRE Graph API v3 检索。免费无 Key，欧洲开放科学仓储聚合。
+
+    只检索 type=publication（与其他源的"论文"范围一致；数据集/软件需自行去掉该过滤）。
+    优势：欧洲机构仓储覆盖（含非英文文献），instances 携带仓储落地页链接；
+    pids 携带 DOI 时可无缝衔接下载接口的 arXiv 反查链。
+    """
+    params = {
+        "search": query,
+        "type": "publication",
+        "pageSize": min(limit, 100),
+        "page": 1,
+    }
+    resp = _get_with_retry(OPENAIRE_API_URL, params, timeout=25)
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise RuntimeError(f"OpenAIRE 返回了无法解析的内容: {e}")
+
+    results = []
+    for w in data.get("results") or []:
+        title = w.get("mainTitle")
+        if not title and w.get("subTitle"):
+            title = w.get("subTitle")
+        authors = []
+        for a in w.get("authors") or []:
+            if isinstance(a, dict):
+                authors.append(a.get("fullName", ""))
+            elif a:
+                authors.append(str(a))
+        # 摘要在 descriptions（HTML 片段），去标签取第一条
+        abstract = None
+        for d in w.get("descriptions") or []:
+            if d:
+                abstract = re.sub(r"<[^>]+>", "", d).strip() or None
+                break
+        doi = None
+        for pid in w.get("pids") or []:
+            if isinstance(pid, dict) and pid.get("scheme") == "doi":
+                doi = pid.get("value")
+                break
+        container = w.get("container") or {}
+        venue = container.get("name")
+        # instances[].urls 多为仓储落地页而非 PDF 直链；仅明确的 .pdf 直链才作 pdf_url，
+        # 落地页一律归 page_url（喂给下载接口只会得到「不是有效的 PDF」的误导性报错）。
+        # 超时/重试说明：openaire 是 multi 串行链中最新的源，失败最坏计约 80s；
+        # 若线上常态超时，考虑为其单独降 MAX_RETRIES（性能审查 L-1 备案）。
+        page_url = None
+        pdf_url = None
+        best = (w.get("bestAccessRight") or {}).get("label")
+        for inst in w.get("instances") or []:
+            urls = inst.get("urls") or []
+            if urls and not page_url:
+                first = urls[0]
+                page_url = first
+                if best == "OPEN" and first.lower().split("?")[0].endswith(".pdf"):
+                    pdf_url = first
+                break
+        results.append(_norm_result(
+            title=title,
+            authors=authors,
+            published=w.get("publicationDate"),
+            abstract=abstract,
+            venue=venue,
+            doi=doi,
+            pdf_url=pdf_url,
+            page_url=page_url,
+            source="openaire",
+        ))
+    return results
+
+
 # 来源优先级：用于聚合去重后排序（被多平台收录的排前，同分时按此优先级）
-# S2/OpenAlex 元数据质量最高，arXiv/DBLP 次之，Crossref/PubMed/EuropePMC 补充。
-_SOURCE_PRIORITY = {"semantic_scholar": 0, "openalex": 1, "arxiv": 2, "dblp": 3, "crossref": 4, "pubmed": 5, "europmc": 6, "core": 7}
+# S2/OpenAlex 元数据质量最高，arXiv/DBLP 次之，Crossref/PubMed/EuropePMC/OpenAIRE 补充。
+_SOURCE_PRIORITY = {"semantic_scholar": 0, "openalex": 1, "arxiv": 2, "dblp": 3, "crossref": 4, "pubmed": 5, "europmc": 6, "core": 7, "openaire": 8}
 # multi 聚合默认查询的源（排除限流敏感的 S2：多源并发会加剧其 429）
-# CORE 需 Key，未设置时自动跳过；DBLP/EuropePMC 免费无 Key 稳定可用。
-_MULTI_SOURCES = ["openalex", "crossref", "arxiv", "dblp", "europmc"]
+# CORE 需 Key，未设置时自动跳过；DBLP/EuropePMC/OpenAIRE 免费无 Key 稳定可用。
+_MULTI_SOURCES = ["openalex", "crossref", "arxiv", "dblp", "europmc", "openaire"]
 
 
 def _dedup_key(p: dict) -> str | None:
@@ -611,6 +687,8 @@ def run_search(query: str, limit: int, mode: str, source: str):
         return search_europmc(query, limit, mode)
     if source == "core":
         return search_core(query, limit, mode)
+    if source == "openaire":
+        return search_openaire(query, limit, mode)
 
     # auto: 多源串联，首个返回非空结果的源即用，避免单一平台限流/无数据阻断
     # 优先级：Semantic Scholar（覆盖广）→ OpenAlex（含 OA PDF）→ arXiv（预印本，纯预印本话题命中率高）
@@ -641,6 +719,7 @@ def _run_multi_search(query: str, limit: int, mode: str):
         "arxiv": ("arXiv", search_arxiv),
         "dblp": ("DBLP", search_dblp),
         "europmc": ("Europe PMC", search_europmc),
+        "openaire": ("OpenAIRE", search_openaire),
     }
     # CORE 需 API Key，有 Key 时才加入聚合
     if CORE_API_KEY:
@@ -704,7 +783,7 @@ def main():
     ap = argparse.ArgumentParser(description="学术论文搜索")
     ap.add_argument("query", help="搜索的主题关键词，或论文标题（配合 --mode title）")
     ap.add_argument("--mode", choices=["topic", "title"], default="topic", help="搜索模式：topic=主题关键词，title=论文标题")
-    ap.add_argument("--source", choices=["auto", "multi", "semanticscholar", "openalex", "crossref", "pubmed", "arxiv", "dblp", "europmc", "core"], default="auto", help="搜索源：auto=依次降级(S2→OpenAlex→arXiv)；multi=多平台聚合去重(覆盖最广)；也可单指定 openalex/crossref/pubmed/arxiv/semanticscholar/dblp/europmc/core")
+    ap.add_argument("--source", choices=["auto", "multi", "semanticscholar", "openalex", "crossref", "pubmed", "arxiv", "dblp", "europmc", "core", "openaire"], default="auto", help="搜索源：auto=依次降级(S2→OpenAlex→arXiv)；multi=多平台聚合去重(覆盖最广)；也可单指定 openalex/crossref/pubmed/arxiv/semanticscholar/dblp/europmc/core/openaire")
     ap.add_argument("--limit", type=int, default=20, help="返回结果数量，默认 20（multi 模式下去重后可能不足此数，取决于多源重叠程度）")
     ap.add_argument("--json", action="store_true", help="以 JSON 格式输出（供程序处理），默认人类可读格式")
     args = ap.parse_args()
