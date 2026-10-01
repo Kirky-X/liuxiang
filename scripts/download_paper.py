@@ -294,6 +294,16 @@ def fetch_unpaywall_pdf(doi: str) -> str | None:
     return None
 
 
+def _decode_response(resp) -> str:
+    """ChinaXiv 响应不带 HTTP charset 头，requests 对 text/* 会按 latin-1 解码
+    resp.text，中文页面全变乱码（真实冒烟测出）；站点页面均为 UTF-8，
+    此处按 UTF-8 解码字节流。"""
+    encoding = getattr(resp, "encoding", None)
+    if encoding and encoding.lower() not in ("iso-8859-1", "latin-1"):
+        return resp.text
+    return resp.content.decode("utf-8", errors="replace")
+
+
 def fetch_chinaxiv_page(chinaxiv_id: str) -> dict:
     """抓取 ChinaXiv abs 页面并解析元数据与全文下载 uuid。
 
@@ -308,7 +318,7 @@ def fetch_chinaxiv_page(chinaxiv_id: str) -> dict:
         raise RuntimeError(f"ChinaXiv 页面获取失败（{chinaxiv_id}）：{e}。") from e
     if resp.status_code != 200:
         raise RuntimeError(f"ChinaXiv 页面获取失败（HTTP {resp.status_code}）：{url}。条目可能不存在。")
-    html = resp.text
+    html = _decode_response(resp)
 
     meta: dict = {"title": None, "authors": [], "abstract": None, "doi": None, "pdf_uuid": None}
 
@@ -445,7 +455,8 @@ def download_pdf(pdf_url: str) -> str:
     resp = _get_with_retry(pdf_url, timeout=60)
     if resp.status_code == 403:
         # 去标签 + 去 ANSI 转义/控制字符，防止响应体伪装终端输出
-        snippet = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", resp.text or "")
+        snippet = _decode_response(resp)
+        snippet = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", snippet)
         snippet = re.sub(r"[\x00-\x1f\x7f]", " ", re.sub(r"<[^>]+>", " ", snippet))
         snippet = " ".join(snippet.split())[:120]
         raise RuntimeError(

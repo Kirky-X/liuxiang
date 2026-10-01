@@ -352,6 +352,27 @@ class TestChinaXiv(unittest.TestCase):
         self.assertIsNone(arxiv_id)
         self.assertTrue(pdf_url.endswith("&filetype=pdf"))
 
+    def test_response_without_charset_header_decodes_utf8(self):
+        # 真实冒烟回归：ChinaXiv 不发 charset 头，requests 对 resp.text 按 latin-1
+        # 解码导致中文乱码；修复后按 resp.content 的 UTF-8 字节解码
+        class NoCharsetResp(FakeChinaXivResp):
+            def __init__(self, text):
+                super().__init__(text=text)
+                self.encoding = None  # requests 对无 charset 的 text/* 默认按 latin-1
+
+        good = NoCharsetResp(CHINAXIV_PAGE)
+        good.encoding = None
+        with mock.patch.object(dp, "_get_with_retry", return_value=good):
+            meta, pdf_url = dp.resolve_chinaxiv("202410.00098")
+        self.assertEqual(meta["title"], "所谓影响关系有待商榷：对温忠麟等人（2024）的评论")
+
+        maintenance = NoCharsetResp("<html><title>\u7cfb\u7edf\u6b63\u5728\u7ef4\u62a4\u4e2d</title></html>")
+        maintenance.status_code = 403
+        maintenance.encoding = "iso-8859-1"
+        with mock.patch.object(dp, "_get_with_retry", return_value=maintenance):
+            with self.assertRaisesRegex(RuntimeError, "系统正在维护中"):
+                dp.download_pdf(f"{dp.CHINAXIV_BASE_URL}/user/download.htm?uuid=x&filetype=pdf")
+
     def test_download_403_maintenance_raises_explicitly(self):
         maintenance = FakeChinaXivResp(status_code=403, text="<html><title>系统正在维护中</title></html>")
         with mock.patch.object(dp, "_get_with_retry", return_value=maintenance):
