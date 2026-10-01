@@ -1,0 +1,225 @@
+{
+  "description": "claim-faithfulness audit 校准金标集（v3.8 #103，12 alignment + 8 constraint；与 perfect_judge 桩成对构造，保证 T-C1/2/3 端到端零误差）",
+  "thresholds": {
+    "FNR": 0.15,
+    "FPR": 0.1
+  },
+  "tuples": [
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "Transformer 使用多头自注意力机制。",
+      "ref_text_excerpt": "We rely entirely on multi-head self-attention, dispensing with recurrence.",
+      "anchor": {
+        "kind": "section",
+        "value": "3.2"
+      },
+      "expected_judgment": "SUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "该模型在 WMT14 英德翻译上取得 28.4 BLEU。",
+      "ref_text_excerpt": "our model achieves 28.4 BLEU on WMT14 En-De",
+      "anchor": {
+        "kind": "section",
+        "value": "6.1"
+      },
+      "expected_judgment": "SUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "训练使用 8 块 NVIDIA P100 GPU。",
+      "ref_text_excerpt": "We trained on 8 NVIDIA P100 GPUs",
+      "anchor": {
+        "kind": "section",
+        "value": "5.1"
+      },
+      "expected_judgment": "SUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "残差连接（residual connection）有助于深层网络训练。",
+      "ref_text_excerpt": "residual connections ease training of deep networks",
+      "anchor": {
+        "kind": "section",
+        "value": "3.1"
+      },
+      "expected_judgment": "SUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "位置编码采用正弦位置编码（positional encoding）。",
+      "ref_text_excerpt": "we inject positional encoding using sine and cosine functions",
+      "anchor": {
+        "kind": "section",
+        "value": "3.5"
+      },
+      "expected_judgment": "SUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "该论文提出了 dropconnect 正则化。",
+      "ref_text_excerpt": "We propose the Transformer, a new architecture based solely on attention.",
+      "anchor": {
+        "kind": "section",
+        "value": "1"
+      },
+      "expected_judgment": "UNSUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "实验在 ImageNet 上进行。",
+      "ref_text_excerpt": "experiments on two machine translation tasks (WMT14)",
+      "anchor": {
+        "kind": "section",
+        "value": "5"
+      },
+      "expected_judgment": "UNSUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "作者声称参数量为 213M。",
+      "ref_text_excerpt": "Table 3 lists architecture variants with different layer counts.",
+      "anchor": {
+        "kind": "table",
+        "value": "3"
+      },
+      "expected_judgment": "UNSUPPORTED"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "BLEU 分数随层数单调递增。",
+      "ref_text_excerpt": "Table 2 varies the number of attention heads; quality may fluctuate within 0.1 BLEU.",
+      "anchor": {
+        "kind": "section",
+        "value": "3.2.2"
+      },
+      "expected_judgment": "AMBIGUOUS"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "big 模型训练用时 3.5 天。",
+      "ref_text_excerpt": "training time: 3.5 days (big), though the schedule might vary by hardware.",
+      "anchor": {
+        "kind": "table",
+        "value": "5"
+      },
+      "expected_judgment": "AMBIGUOUS"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "该方法也适用于语音识别（speech recognition）。",
+      "ref_text_excerpt": "we also present results on parsing (Section 7.4); speech recognition could possibly benefit.",
+      "anchor": {
+        "kind": "section",
+        "value": "7.4"
+      },
+      "expected_judgment": "AMBIGUOUS"
+    },
+    {
+      "tuple_kind": "alignment",
+      "claim_text": "附录给出了全部超参数。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "RETRIEVAL_FAILED"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "本节未说明随机种子设置。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "VIOLATED",
+      "constraint_under_test_id": "MNC-1",
+      "constraint_under_test_rule_text": "结果部分必须报告随机种子与运行次数。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "图表未附误差棒。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "VIOLATED",
+      "constraint_under_test_id": "MNC-2",
+      "constraint_under_test_rule_text": "所有量化图表必须附不确定性（std/CI）。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "代码与数据链接缺失。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "VIOLATED",
+      "constraint_under_test_id": "MNC-3",
+      "constraint_under_test_rule_text": "可复现性：提供代码或数据链接。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "正文声称 SOTA 但未按规范列明对比基线。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "VIOLATED",
+      "constraint_under_test_id": "NC-CN-1",
+      "constraint_under_test_rule_text": "SOTA 声明须列明对比基线。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "负结果被省略。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "VIOLATED",
+      "constraint_under_test_id": "NC-CN-2",
+      "constraint_under_test_rule_text": "须报告失败案例与负结果。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "方法部分提供了完整的形式化公式。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "NOT_VIOLATED",
+      "constraint_under_test_id": "MNC-4",
+      "constraint_under_test_rule_text": "方法部分须含可复现的形式化描述。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "参考文献格式符合会议模板要求。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "NOT_VIOLATED",
+      "constraint_under_test_id": "MNC-5",
+      "constraint_under_test_rule_text": "引用格式符合 venue 要求。"
+    },
+    {
+      "tuple_kind": "constraint",
+      "claim_text": "限制一节明确列出了计算开销。",
+      "ref_text_excerpt": null,
+      "anchor": {
+        "kind": "none",
+        "value": ""
+      },
+      "expected_judgment": "NOT_VIOLATED",
+      "constraint_under_test_id": "MNC-6",
+      "constraint_under_test_rule_text": "必须讨论计算复杂度与资源开销。"
+    }
+  ]
+}
