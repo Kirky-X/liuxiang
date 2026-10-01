@@ -6,6 +6,7 @@ download_paper.py — 论文下载并转换为 Markdown（接口二）
   - arXiv ID              例如 2306.12345、2306.12345v2、hep-th/9901001（旧格式也支持）
   - Semantic Scholar ID   例如 649def34f8be52c8b66281af98ae884c09aef38b
   - DOI                   例如 10.1145/3025453.3025717
+  - ChinaXiv ID/DOI/链接   例如 202410.00098、10.12074/202410.00098、https://chinaxiv.org/abs/202410.00098
   - 直接的 PDF 链接        例如 https://arxiv.org/pdf/2306.12345
 
 转换策略（优先无损格式，PDF 仅作兜底）：
@@ -31,6 +32,7 @@ OA PDF 解析链：Semantic Scholar openAccessPdf → Unpaywall（DOI 反查 OA 
     ARXIV_API_URL      默认 https://export.arxiv.org/api/query
     UNPAYWALL_API_URL  默认 https://api.unpaywall.org/v2
     UNPAYWALL_EMAIL    Unpaywall 礼貌池邮箱（必须是真实邮箱，example.com 会被拒）
+    CHINAXIV_BASE_URL  默认 https://chinaxiv.org
 """
 
 import argparse
@@ -61,6 +63,9 @@ ARXIV_API_URL = os.environ.get("ARXIV_API_URL", "https://export.arxiv.org/api/qu
 # 未设置或邮箱无效时自动跳过，不影响其他下载路径。
 UNPAYWALL_API_URL = os.environ.get("UNPAYWALL_API_URL", "https://api.unpaywall.org/v2")
 UNPAYWALL_EMAIL = os.environ.get("UNPAYWALL_EMAIL", "")
+# ChinaXiv（中科院预印本平台）：无官方开放 API，走 abs 页面解析。
+# 其 DOI 前缀 10.12074 由 ISTIC 注册，Crossref/OpenAlex 结构性不收录，是现有源的唯一盲区。
+CHINAXIV_BASE_URL = os.environ.get("CHINAXIV_BASE_URL", "https://chinaxiv.org")
 
 # 新格式：2306.12345 / 2306.12345v2；旧格式（2007年前）：hep-th/9901001、math.GT/0309136
 ARXIV_ID_RE = re.compile(
@@ -68,6 +73,9 @@ ARXIV_ID_RE = re.compile(
     re.IGNORECASE,
 )
 DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
+# ChinaXiv ID：YYYYMM.NNNNN（如 202410.00098），可带版本号 v2；与 arXiv 的 4 位月前缀不重叠
+CHINAXIV_ID_RE = re.compile(r"^(chinaxiv:)?(\d{6}\.\d{4,6}(?:[vV]\d+)?)$")
+CHINAXIV_URL_RE = re.compile(r"^https?://(?:www\.)?chinaxiv\.org/abs/([\w.]+)", re.IGNORECASE)
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRIES = 2
@@ -286,6 +294,75 @@ def fetch_unpaywall_pdf(doi: str) -> str | None:
     return None
 
 
+def fetch_chinaxiv_page(chinaxiv_id: str) -> dict:
+    """抓取 ChinaXiv abs 页面并解析元数据与全文下载 uuid。
+
+    返回 {"title", "authors", "abstract", "doi", "pdf_uuid"}；请求失败抛 RuntimeError。
+    页面无 og:/citation_ 元标签（JS 渲染为主），标题/作者取自页内引用串
+    「作者.标题.中国科学院科技论文预发布平台.[DOI:10.12074/...]」，摘要取自「摘要: </b>…</div>」块。
+    """
+    url = f"{CHINAXIV_BASE_URL}/abs/{chinaxiv_id}"
+    try:
+        resp = _get_with_retry(url, timeout=20)
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"ChinaXiv 页面获取失败（{chinaxiv_id}）：{e}。") from e
+    if resp.status_code != 200:
+        raise RuntimeError(f"ChinaXiv 页面获取失败（HTTP {resp.status_code}）：{url}。条目可能不存在。")
+    html = resp.text
+
+    meta: dict = {"title": None, "authors": [], "abstract": None, "doi": None, "pdf_uuid": None}
+
+    # 引用串用有界否定字符类（[^.<]），禁止惰性全量匹配：失配时组合回溯在
+    # 大页面（几十 KB 单行 HTML）上会卡死进程分钟级（性能审查 C-1 实证）
+    cite = re.search(
+        r"<span>\s*([^.<]{1,200})\.([^.<]{1,500})\.中国科学院科技论文预发布平台\.\[DOI:\s*(10\.12074/[^\]\s<]{1,200})\s*\]",
+        html,
+    )
+    if cite:
+        meta["authors"] = [cite.group(1).strip()]
+        meta["title"] = cite.group(2).strip()
+        meta["doi"] = cite.group(3).strip()
+    else:
+        # 引用串解析失败时至少拿回 DOI（页面正文必含 10.12074 链接）
+        doi_m = re.search(r"(10\.12074/[\w.]+)", html)
+        if doi_m:
+            meta["doi"] = doi_m.group(1)
+
+    abs_m = re.search(r"摘要:\s*</b>(.*?)</div>", html, re.DOTALL)
+    if abs_m:
+        text = re.sub(r"<[^>]+>", "", abs_m.group(1))
+        meta["abstract"] = re.sub(r"\s+", " ", text).strip() or None
+
+    pdf_m = re.search(r"/user/download\.htm\?uuid=([0-9a-fA-F-]{36})&filetype=pdf", html)
+    if pdf_m:
+        meta["pdf_uuid"] = pdf_m.group(1)
+    return meta
+
+
+def resolve_chinaxiv(chinaxiv_id: str):
+    """返回 (meta, pdf_url)。条目未挂载全文时抛 RuntimeError（附上已取到的元数据与摘要，
+    供 agent 直接把摘要整理给用户——ChinaXiv 无检索 API，摘要拿不到第二次）。"""
+    chinaxiv_id = chinaxiv_id.strip().rstrip("/")
+    bare_id = re.sub(r"[vV]\d+$", "", chinaxiv_id)
+    meta = fetch_chinaxiv_page(bare_id)
+    meta.setdefault("venue", None)
+    if not meta.get("venue"):
+        meta["venue"] = "ChinaXiv（中科院预印本）"
+    pdf_url = None
+    if meta.get("pdf_uuid"):
+        pdf_url = f"{CHINAXIV_BASE_URL}/user/download.htm?uuid={meta['pdf_uuid']}&filetype=pdf"
+    if not pdf_url:
+        title_line = f"标题: {meta.get('title') or '（未知）'}"
+        author_line = f"作者: {', '.join(meta.get('authors') or []) or '未知'}"
+        abstract_line = f"摘要: {(meta.get('abstract') or '（页面未提供）')[:300]}"
+        raise RuntimeError(
+            f"ChinaXiv 条目 {bare_id} 未挂载可下载的全文 PDF，仅元数据与摘要可获取。\n"
+            f"{title_line}\n{author_line}\n{abstract_line}\n"
+            "（请把以上元数据与摘要整理给用户，不要编造全文。）"
+        )
+    return meta, pdf_url
+
+
 def resolve_metadata(identifier: str):
     """返回 (meta_dict, pdf_url, arxiv_id)。
 
@@ -297,12 +374,23 @@ def resolve_metadata(identifier: str):
 
     # 情况一：直接给的 URL——无法推断 arXiv 版本，只能走 PDF。
     if identifier.startswith(("http://", "https://")):
+        # ChinaXiv 条目页不是 PDF，先拦截走专用解析
+        m_url = CHINAXIV_URL_RE.match(identifier)
+        if m_url:
+            meta, pdf_url = resolve_chinaxiv(m_url.group(1))
+            return meta, pdf_url, None
         # SSRF 防护：scheme 白名单 + 拒绝本机/内网/链路本地目标（含 DNS 解析后校验）
         validate_public_http_url(identifier)
         meta = {"title": None, "authors": [], "published": None, "abstract": None, "venue": None}
         return meta, identifier, None
 
-    # 情况二：arXiv ID —— PDF 链接直接拼接，不依赖 Semantic Scholar 是否收录，
+    # 情况二：ChinaXiv ID（YYYYMM.NNNNN，与 arXiv 的 4 位月前缀不重叠）
+    m_cx = CHINAXIV_ID_RE.match(identifier)
+    if m_cx:
+        meta, pdf_url = resolve_chinaxiv(m_cx.group(2))
+        return meta, pdf_url, None
+
+    # 情况三：arXiv ID —— PDF 链接直接拼接，不依赖 Semantic Scholar 是否收录，
     # 这样即使 S2 查不到元数据（比如刚提交的新论文，或 S2 限流），下载依然能成功。
     m = ARXIV_ID_RE.match(identifier)
     if m:
@@ -319,7 +407,12 @@ def resolve_metadata(identifier: str):
         pdf_url = f"{ARXIV_PDF_BASE}/{arxiv_id}"
         return meta, pdf_url, arxiv_id
 
-    # 情况三：DOI
+    # 情况四：ChinaXiv DOI（10.12074/...，ISTIC 注册，Crossref/OpenAlex 均不收录，须先于通用 DOI 拦截）
+    if identifier.lower().startswith("10.12074/"):
+        meta, pdf_url = resolve_chinaxiv(identifier[len("10.12074/"):])
+        return meta, pdf_url, None
+
+    # 情况五：DOI
     if DOI_RE.match(identifier):
         meta = fetch_semantic_scholar_meta(f"DOI:{identifier}")
         if not meta:
@@ -335,7 +428,7 @@ def resolve_metadata(identifier: str):
         pdf_url = meta.get("pdf_url") or f"{ARXIV_PDF_BASE}/{meta['arxiv_id']}"
         return meta, pdf_url, meta.get("arxiv_id")
 
-    # 情况四：当作 Semantic Scholar 的 paper ID
+    # 情况六：当作 Semantic Scholar 的 paper ID
     meta = fetch_semantic_scholar_meta(identifier)
     if not meta:
         raise RuntimeError(f"未能找到标识符 {identifier} 对应的论文（Semantic Scholar 暂未收录，或标识符有误）。")
@@ -350,6 +443,16 @@ def download_pdf(pdf_url: str) -> str:
     # SSRF 防护同样适用于远程元数据接口（S2 openAccessPdf / Unpaywall）返回的链接
     validate_public_http_url(pdf_url)
     resp = _get_with_retry(pdf_url, timeout=60)
+    if resp.status_code == 403:
+        # 去标签 + 去 ANSI 转义/控制字符，防止响应体伪装终端输出
+        snippet = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", resp.text or "")
+        snippet = re.sub(r"[\x00-\x1f\x7f]", " ", re.sub(r"<[^>]+>", " ", snippet))
+        snippet = " ".join(snippet.split())[:120]
+        raise RuntimeError(
+            f"全文下载端点拒绝访问（HTTP 403）：{pdf_url}。"
+            f"站点返回：{snippet or '（无正文）'}。"
+            "常见于站点维护或反爬拦截——此时仅元数据与摘要可获取，不要编造全文。"
+        )
     resp.raise_for_status()
     if not resp.content.startswith(b"%PDF"):
         raise RuntimeError(f"下载到的内容不是有效的 PDF 文件（来自 {pdf_url}）。链接可能需要登录/付费访问，或已失效。")
