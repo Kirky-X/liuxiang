@@ -291,6 +291,31 @@ Every material artifact produced by the pipeline carries a version label. These 
     "integration_lead": null
   },
   "loop_count": 0,
+  "token_ledger": [
+    {
+      "stage": "1",
+      "outcome": "Literature Corpus (22 篇)",
+      "tokens_actual": "118k",
+      "tokens_budget": "90k",
+      "ratio": 1.31,
+      "checkpoint_escalated": false
+    }
+  ],
+  "lessons": {
+    "verified_facts": [
+      "DOI 10.1234/xyz 无 OA 全文（Unpaywall 与 S2 均未命中）"
+    ],
+    "patterns": [
+      "评审员对功效分析不足的敏感度高于样本量本身"
+    ],
+    "lessons_and_constraints": [
+      "勿再重试 DOI 10.1234/xyz 的全文下载",
+      "回应 R2 的统计质疑前先补功效分析"
+    ],
+    "open_questions": [
+      "用户是否接受缩小到两个数据集"
+    ]
+  },
   "collaboration_depth_history": [
     {
       "stage_id": "1",
@@ -415,7 +440,6 @@ Append a Collaboration Depth Observer report (added in v3.3.0, behind `measures:
 Violations are rejected with reason, consistent with the State Update Protocol.
 
 ### 8. generate_dashboard()
-
 Produce the Progress Dashboard. Format as follows:
 
 ```
@@ -450,6 +474,42 @@ Produce the Progress Dashboard. Format as follows:
 ```
 Pipeline: [v]RES -> [v]WRT -> [v]INT -> [v]REV -> [..]REVISE -> [ ]RE-REV -> [ ]RE-REV' -> [ ]F-INT -> [ ]FIN
 ```
+
+---
+
+## Token Ledger（v0.1，全程成本记账）
+
+借鉴 AI-Scientist-v2 的 token_tracker 模式：启动时预算估算（pipeline.md § Budget Transparency）只是承诺，每个检查点由 tracker 追加一行实际用量（追加写入 `token_ledger[]`，append-only）：
+
+```json
+{
+  "stage": "1",
+  "outcome": "Literature Corpus (22 篇)",
+  "tokens_actual": "118k",
+  "tokens_budget": "90k",
+  "ratio": 1.31,
+  "checkpoint_escalated": false
+}
+```
+
+**升级规则（确定性，无裁量）**：`ratio ≥ 2` 时该阶段检查点强制升级为 MANDATORY（无论原定 FULL/SLIM），提示须包含超支对照行与剩余预算。完整 ledger 进入 Stage 6 Process Record。写入规则：budget 行由 orchestrator 阶段启动前请求写入；actual 行由 tracker 在检查点写入；唯一位点写入者是 `state_tracker`。
+
+---
+
+## Lessons Memory（v0.1，跨阶段持久记忆）
+
+借鉴 orchestra findings.md 四段式：修订循环重蹈覆辙的根因是阶段间只有产物交接、没有教训交接。`lessons` 是四段式结构化记忆，各阶段在检查点读（注入下一阶段输入）、完成时写：
+
+| 段 | 内容 | 示例 |
+|----|------|------|
+| `verified_facts` | 已核验为真的关键事实 | "DOI 10.1234/xyz 无 OA 全文" |
+| `patterns` | 跨阶段观察到的规律 | "评审员对功效分析的敏感度高于样本量" |
+| `lessons_and_constraints` | 可执行教训，动词开头 | "勿再重试 DOI 10.1234/xyz""回应 R2 前先补功效分析" |
+| `open_questions` | 未决问题 | "用户是否接受缩小数据集范围" |
+
+**写入规则**：每段条目一行一条、带阶段来源标签；禁止删改历史条目（append-only，纠错以新条目覆盖语义）。**读取规则**：orchestrator 在每次阶段转换时把 `lessons_and_constraints` 全文注入下一阶段的输入；re-review 前必须重读（防重蹈第一轮覆辙）。**失效自测**：读完 lessons 应能写出论文当前状态的摘要——写不出即记忆失效，上报 orchestrator。同一 lesson 被重复踩到两次，orchestrator 记为流程缺陷并升级用户。
+
+**质量红线**：lessons 只记录核验过的事实与明确教训；推测未经核验前进 `open_questions`，不得冒充 `verified_facts`（防记忆污染，规则同 Integrity History）。
 
 ---
 

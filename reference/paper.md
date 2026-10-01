@@ -179,7 +179,7 @@ Multi-phase agents (Bucket B: `argument_builder` P3+Plan, `visualization` P4+P7)
 
 Routing into Mode B requires an explicit user signal — a `[direct-mode]` prefix or an explicit per-module `$ARGUMENTS` selection（见 [`../SKILL.md`](../SKILL.md) 模块路由）. Ambiguous cross-phase input defaults to clarification before any phase runs.
 
-**Enforcement:** prompt-level via Phase Boundary blocks on Bucket A agents. ⚠️ 依赖缺失，当前版本未实现：上游 ARS 的 advisory verifier（`scripts/check_pipeline_integrity.py`）、deterministic PreToolUse hook、multi-phase envelope 均未随本套件发布。
+**Enforcement:** prompt-level via Phase Boundary blocks on Bucket A agents. 评审路线图 / R&R 矩阵等交接物的确定性校验由 [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) 提供（pipeline 模块在阶段转换点调用）。⚠️ 依赖缺失，当前版本未实现：deterministic PreToolUse hook、multi-phase envelope 未随本套件发布。
 
 ## v3.6.6 Generator-Evaluator Contract Protocol
 
@@ -282,7 +282,7 @@ The v3.6.3 `ARS_PASSPORT_RESET=1` `reset_boundary[]` mechanism (per `../referenc
 - **No cross-session resume mid-round**: the four-phase generator-evaluator round is an in-session atomic unit. Manual session split mid-round loses the writer Phase 4a artefact and forces restart from Phase 0. v3.6.7+ may introduce a `pre_commitment_history[]` ledger entry in Schema 9 to persist the writer Phase 4a artefact across session boundaries; v3.6.6 does not implement.
 - **In-pair Phase 6 evaluator vs reviewer 模块 external review**: the in-pair `peer_reviewer_agent` (Phase 6 evaluator with the v3.6.6 contract gate) and reviewer 模块 (Stage 3 5-panel external editorial review, `reference/reviewer.md`) serve different review layers and remain documented as known technical debt. Routing / merge decisions are deferred.
 
-## Operational Modes (10 Modes)
+## Operational Modes (11 Modes)
 
 See `../references/mode_selection_guide.md` for details.
 
@@ -293,11 +293,12 @@ See `../references/mode_selection_guide.md` for details.
 | `revision`              | "Revise paper"                                                   | 8->5->6                      | Revised draft with tracked changes (uses `../templates/revision_tracking_template.md`)                |
 | `abstract-only`         | "Write abstract"                                                 | 1->7                         | Bilingual abstract + keywords                                                                      |
 | `lit-review`            | "Literature review"                                              | 1->2                         | Annotated bibliography + synthesis                                                                 |
-| `format-convert`        | "Convert to LaTeX" / "Convert citations to [format]"             | 9 only                       | Formatted document; includes citation format conversion (APA 7 / Chicago / MLA / IEEE / Vancouver) |
+| `format-convert`        | "Convert to LaTeX" / "Convert citations to [format]"             | 9 only                       | Formatted document; includes citation format conversion (APA 7 / Chicago / MLA / IEEE / Vancouver); **编译前先跑 [`../scripts/check_latex.py`](../scripts/check_latex.py) 机械四查，问题清单喂给 formatter_agent 修订后复跑，清零才编译（上限 3 轮）** |
 | `citation-check`        | "Check citations"                                                | 6 only                       | Citation error report                                                                              |
 | `plan`                  | "guide my paper" / "help me plan my paper"                       | 1->10->3->4                  | Chapter Plan + INSIGHT Collection                                                                  |
 | `revision-coach`        | "parse reviews" / "revision roadmap" / "I got reviewer comments" | 12 only                      | Revision Roadmap + optional Tracking Template + Response Letter Skeleton                           |
 | **`disclosure`** (v3.2) | **"AI disclosure for Nature" / "generate AI usage statement"**   | **9 only**                   | **Venue-specific AI-usage disclosure paragraph(s) + placement instructions**                       |
+| **`rebuttal-audit`** (v0.1) | **"audit my response to reviewers" / "check my rebuttal"**       | **12 only（复用 revision_coach）** | **Rebuttal Audit Report：审稿意见→回应主张→修订稿验证的三列闭环审计，no generation**               |
 
 ### Quick Mode Selection Guide
 
@@ -313,6 +314,7 @@ See `../references/mode_selection_guide.md` for details.
 | Need to convert format (LaTeX, DOCX) or citation style             | `format-convert` | fidelity    |
 | Want a systematic literature review paper                          | `lit-review`     | fidelity    |
 | Need a venue-specific AI-usage disclosure statement for submission | `disclosure`     | fidelity    |
+| Got real journal reviewer comments back and want my rebuttal audited before sending | `rebuttal-audit` | fidelity |
 
 **Spectrum** (v3.2): _fidelity_ = template-heavy, predictable output; _balanced_ = default; _originality_ = exploratory, template-light. （上游 ARS 的跨技能 spectrum 表 `shared/mode_spectrum.md` ⚠️ 依赖缺失，未随本套件发布；三档定义以本句为准。）
 
@@ -321,6 +323,19 @@ Not sure? Start with `plan` — it will guide you step by step. `disclosure` is 
 ### Mode Selection Logic
 
 > See `../references/mode_selection_guide.md` for trigger-to-mode mappings and the full selection flowchart.
+
+---
+
+## Rebuttal-Audit Mode (v0.1, no generation)
+
+对用户既有的 Response to Reviewers 做**纯审计**（借鉴上游 ARS MODE_REGISTRY 的 rebuttal-audit 模式；严格 no generation——不代写回应，只核验既有回应的可审计性）。由 `revision_coach_agent`（agent 12）独自执行：
+
+1. **三列闭环**：每条审稿意见 → 作者的回应主张（Response to Reviewers 原文）→ 是否被修订稿实际验证（定位到章节/图表）。
+2. **复用既有体系**：意见条目沿用 R&R Traceability Matrix 与 Issue ID 语法（`../references/issue_lifecycle_protocol.md`），不新造 ID 空间。
+3. **输出**：Rebuttal Audit Report——逐条判定 `VERIFIED` / `CLAIM_ONLY`（只声称未验证）/ `CONTRADICTED`（修订稿与回应主张矛盾）/ `UNADDRESSED`，附发送前必须修复的清单。
+4. **禁止**：生成新的回应文本、生成新的修订内容、修改用户的 Response Letter（审计者只报告）。
+
+适用场景：真实期刊/会议审稿意见返回后、Response Letter 发出前的最后一道自查。
 
 ---
 
@@ -377,7 +392,7 @@ See `../agents/intake_agent.md` for the complete field definitions of the Phase 
 - Writing: `academic_writing_style`, `writing_quality_check`, `writing_judgment_framework`
 - Structure: `paper_structure_patterns` (6 types), `abstract_writing_guide`
 - Domain: `hei_domain_glossary` (bilingual), `journal_submission_guide`, `latex_template_reference`
-- Process: `failure_paths` (12 scenarios), `mode_selection_guide` (10 modes), `plan_mode_protocol`, `workflow_phase_details`
+- Process: `failure_paths` (12 scenarios), `mode_selection_guide` (11 modes), `plan_mode_protocol`, `workflow_phase_details`
 - Ethics: `credit_authorship_guide` (CRediT 14 roles), `funding_statement_guide`, `statistical_visualization_standards`
 - Disclosure (v3.2): `disclosure_mode_protocol` (venue-specific AI-usage statement generation), `venue_disclosure_policies` (v1 database: ICLR, NeurIPS, Nature, Science, ACL, EMNLP)
 - Revision loop: `craft_criteria_checklist` (30 craft criteria, ARC/PRO/MTH/FIG/CIT/PRC), `issue_lifecycle_protocol` (diagnose→act separation, stable issue IDs)
@@ -466,7 +481,7 @@ paper + pipeline -> 端到端编排（10 阶段含诚信审查与两阶段评审
 | Item             | Content                                                                    |
 | ---------------- | -------------------------------------------------------------------------- |
 | Skill Version    | 3.11.0（套件统一版本；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注）       |
-| Last Updated     | 2026-06-01                                                                 |
+| Last Updated     | 2026-10-01 |
 | Maintainer       | Cheng-I Wu                                                                 |
 | Dependent Modules | 本套件 search 模块（upstream 语料）、reviewer 模块（downstream 评审）       |
 

@@ -57,6 +57,27 @@
 
 实测 `intent detection`：三源 top20 几乎不重叠（各平台相关性算法不同），轮转排序让 limit=20 的结果里 OpenAlex/arXiv/Crossref 约 7:7:6 均匀分布。
 
+## OpenAIRE（搜索源：欧洲仓储聚合，Graph API v3）
+
+- 端点：`GET https://api.openaire.eu/graph/v3/research-products`，免费无需 Key。
+- **必须用 v3 JSON 端点**：旧 XML Search API（`api.openaire.eu/search/...`）已于 2026-05-31 停用，`/graph/researchProducts`（无 v3）返回 405。
+- 参数：`search=<关键词>&type=publication&pageSize=N&page=1`（pageSize 上限 100；深翻页用 `cursor=*` 游标）。
+- 响应：`{header: {numFound,...}, results: [...]}`；每条含 `mainTitle`、`authors`（str 或 {fullName} 混合）、`descriptions`（HTML 片段，需去标签）、`pids`（`[{scheme: "doi", value}]` 取 DOI）、`container.name`（venue）、`instances[].urls`（仓储落地页）、`bestAccessRight.label`（OPEN 时 urls 可作 pdf_url 候选）。
+
+## OpenCitations（引用图谱，citation_graph.py）
+
+- 端点：`GET https://opencitations.net/index/api/v2/{citations|references}/doi:<doi>`，CC0，免费无需 Key；裸域名会 301（requests 自动跟随）。
+- 返回 JSON 边列表：`{oci, citing, cited, creation, timespan, journal_sc, author_sc}`；方向语义：citations=谁引用了它（看 citing 列），references=它引用了谁（看 cited 列）。
+- 覆盖以 Crossref/OpenAlex 收录为前提：ISTIC 注册 DOI（ChinaXiv 10.12074 前缀）与极新论文查不到（返回空数组，不是错误）。
+- 定位边界：只做 DOI→引用边确定性查询，不做关键词检索——检索用 search_papers.py。
+
+## ChinaXiv（下载源，download_paper.py；无检索 API）
+
+- 无官方开放 API：旧版 OAI-PMH 端点（`chinaxiv.org/oai.pmh`）已随 2.0 改版 404，站内检索对脚本返回 403 反爬。**只能按 DOI/链接直达下载**。
+- 标识符：ChinaXiv ID `YYYYMM.NNNNN`（可带 v2 版本号）、DOI `10.12074/<id>`、`chinaxiv.org/abs/<id>` 链接，三者等价。
+- 下载链：abs 页面（普通 GET 可达）→ 解析 `/user/download.htm?uuid=<uuid>&filetype=pdf` 直链 → PDF → pymupdf 转换。页内引用串「作者.标题.中国科学院科技论文预发布平台.[DOI:...]」是标题/作者的唯一解析来源（无 og:/citation_ 元标签）。
+- 已知坑：`download.htm` 端点偶发 403「系统正在维护」（维护或反爬拦截）——脚本显性报错并降级为"仅元数据+摘要"，不要重试硬爬。10.12074 前缀由 ISTIC 注册，Crossref/OpenAlex 结构性不收录（前缀查询均 404）。
+
 ## 扩展方向（当前脚本未实现，如需可以加）
 
 - **Wikidata SPARQL**：结构化学术知识查询。实测做论文搜索覆盖差（schloor.md 的示例查询返回 0 篇），不适合做搜索源。

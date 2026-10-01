@@ -26,7 +26,8 @@ User Input →
 │
 ├── Have an existing paper to revise? ──────────────────────→ revision mode
 ├── Just need format conversion? ────────────────────────→ format-convert mode
-└── Just need a citation check? ────────────────────────→ citation-check mode
+├── Just need a citation check? ────────────────────────→ citation-check mode
+└── Have a written Response to Reviewers? ──────────────→ rebuttal-audit mode
 ```
 
 ---
@@ -177,6 +178,22 @@ User Input →
 
 ---
 
+### rebuttal-audit mode — Response to Reviewers Audit (no generation) ★ NEW
+
+**Applicable Scenarios**:
+- 真实期刊/会议审稿意见返回后，Response Letter 发出前的最后一道自查
+- 怀疑自己的回应"说到了但没做到"，需要逐条对照修订稿核验
+
+**Not Applicable When**:
+- 还没有写 Response Letter（→ revision-coach 模式先解析审稿意见）
+- 需要代写或润色回应文本（本模式严格 no generation）
+
+**Expected Output**: Rebuttal Audit Report——审稿意见→回应主张→修订稿验证三列闭环，逐条 VERIFIED / CLAIM_ONLY / CONTRADICTED / UNADDRESSED
+**Expected Duration**: Short
+**Agents Used**: revision_coach used standalone
+
+---
+
 ## Paths from deep-research
 
 ```
@@ -247,6 +264,7 @@ academic-paper completed
 | Completed paper | Abstract | abstract-only mode |
 | Completed paper | Format conversion | format-convert mode |
 | Completed paper | Citation check | citation-check mode |
+| Response to Reviewers written | 发出前自查回应是否兑现 | rebuttal-audit mode |
 
 ---
 

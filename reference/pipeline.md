@@ -56,6 +56,16 @@ resume_from_passport=<hash> [stage=<n>] [mode=<m>]
 - **Intent**: Invoke in a _fresh_ Claude Code session. Resuming within the same session that emitted the boundary provides no token savings and may drop still-live in-session context.
 - **Stage**: Any. Resumes at whatever stage the routing rules above determine.
 - **Reference**: [`../references/passport_as_reset_boundary.md`](../references/passport_as_reset_boundary.md) — see §"`resume_from_passport` mode contract".
+- **脚本化（v0.1）**: 边界哈希链与续跑查找不再依赖 prompt 自觉，由 [`../scripts/passport_tool.py`](../scripts/passport_tool.py) 承担：
+  ```bash
+  # FULL 检查点追加边界快照（自动计算 12 位 SHA-256 链式哈希）
+  python3 scripts/passport_tool.py emit pipeline_passport.json --stage 3 --next 4 --session-marker <sess>
+  # 校验哈希链完整性 + 双消费禁令（阶段转换点/CI 调用）
+  python3 scripts/passport_tool.py validate pipeline_passport.json
+  # resume_from_passport=<hash> 的确定性定位与路由（含 pending_decision 检查）
+  python3 scripts/passport_tool.py resume pipeline_passport.json <hash>
+  ```
+  规范化规则（JCS 字节序列化、占位符 000000000000、仅 boundary 条目入链）以脚本实现为唯一权威，prompt 文本与其不一致时以脚本为准。
 
 **Execution flow:**
 
@@ -293,7 +303,18 @@ After completion:
 After user confirmation:
 
 1. Pass the previous stage's deliverables as input to the next stage
-2. Trigger handoff protocol (defined in each skill's SKILL.md):
+2. **Run the deterministic handoff gate（v0.1 起）**: 校验失败即阻断转换，修复后重跑，禁止带病推进：
+   ```bash
+   # Stage 1 → 2: 文献清单格式
+   python3 scripts/check_pipeline_integrity.py literature-corpus papers/corpus.md --check-paths
+   # Stage 3 → 4: 评审产物的 Issue ID 语法
+   python3 scripts/check_pipeline_integrity.py issue-ids review/roadmap.md --require
+   # Stage 3' → 4': R&R 矩阵完整性
+   python3 scripts/check_pipeline_integrity.py rr-matrix review/re_review.md
+   # Stage 2.5 / 4.5: 7-mode 清单判定完整性 + 阻断条件
+   python3 scripts/check_pipeline_integrity.py failure-modes integrity/stage25.md --stage 2.5
+   ```
+3. Trigger handoff protocol (defined in each skill's SKILL.md):
    - Stage 1  --> 2: search 模块 handoff（Literature Corpus 文献清单 + Markdown 全文，见上方 Stage 1 Output Convention）
    - Stage 2  --> 2.5: Pass complete paper to integrity_verification_agent
    - Stage 2.5 --> 3: Pass verified paper to reviewer
@@ -302,7 +323,7 @@ After user confirmation:
    - Stage 3' --> 4': Pass new Revision Roadmap + R&R Traceability Matrix (Schema 11) to paper 模块 revision mode
    - Stage 4/4' --> 4.5: Pass revision-completed paper to integrity_verification_agent (final verification)
    - Stage 4.5 --> 5: Pass verified final draft to format-convert mode
-3. Begin next stage
+4. Begin next stage
 ```
 
 ### Mid-Conversation Reinforcement Protocol
@@ -345,7 +366,7 @@ In Mode B, **single-phase agents (Bucket A) in the downstream modules (search / 
 
 Routing into Mode B requires an explicit user signal — a `[direct-mode]` prefix or an explicit per-module `$ARGUMENTS` selection（见 [`../SKILL.md`](../SKILL.md) 模块路由）. Ambiguous cross-phase input defaults to clarification by the orchestrator BEFORE any stage runs. **Critically:** if `pipeline_orchestrator_agent` is dispatched on ambiguous cross-phase materials, the orchestrator itself currently cannot reconcile — v3.9.2 routes such cases to clarification BEFORE the orchestrator runs.
 
-**Enforcement:** prompt-level via Phase Boundary blocks on downstream Bucket A agents. ⚠️ 依赖缺失，当前版本未实现：上游 ARS 的 advisory verifier（`scripts/check_pipeline_integrity.py`）、deterministic PreToolUse hook、multi-phase envelope、orchestrator structured intake 均未随本套件发布（原 v3.10 active conductor #134 计划项）。
+**Enforcement:** prompt-level via Phase Boundary blocks on downstream Bucket A agents + 确定性脚本门禁：阶段转换点由 orchestrator 调用 [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) 校验交接物（`literature-corpus` / `issue-ids` / `rr-matrix` / `failure-modes` / `passport` 五个子命令，fail-closed——校验不过即阻断推进），Material Passport 的哈希链与续跑查找由 [`../scripts/passport_tool.py`](../scripts/passport_tool.py) 承担。⚠️ 依赖缺失，当前版本未实现：deterministic PreToolUse hook、multi-phase envelope、orchestrator structured intake 均未随本套件发布（原 v3.10 active conductor #134 计划项）。
 
 ---
 
@@ -419,6 +440,31 @@ At the end of each revision round, if **delta < 3 points** on the 0-100 rubric A
 ### Budget Transparency (v3.2)
 
 At pipeline start, estimate token cost based on paper length, mode, and cross-model toggle. Present estimate and ask for user confirmation before Stage 1 begins.
+
+### Token & Cost Ledger（v0.1，借鉴 AI-Scientist-v2 的 token_tracker 全程记账）
+
+启动时的估算只是承诺；全程实际用量必须记录。`state_tracker_agent` 在**每个检查点**向流水线状态追加一行 token 记账（追加到 `token_ledger[]`，见 [`../agents/state_tracker_agent.md`](../agents/state_tracker_agent.md)）：
+
+```
+| stage | 判定/产出 | tokens_actual | tokens_budget | ratio |
+|-------|-----------|---------------|---------------|-------|
+| 1 RESEARCH | Literature Corpus (22 篇) | 118k | 90k | 1.31 |
+```
+
+- **2× 升级规则（确定性，不留裁量）**：某阶段 `tokens_actual / tokens_budget ≥ 2` 时，该阶段检查点自动升级为 **MANDATORY**（即使原定 SLIM/FULL），提示必须包含超支阶段的对照行与下一阶段的预算余量；用户确认后才能继续。
+- 记账行进入 Stage 6 的 Process Record（AI Self-Reflection Report 附完整 `token_ledger[]`），可审计。
+- 预算行由 orchestrator 在阶段启动前写入；`state_tracker` 是唯一位点写入者（State Ownership Protocol 不变）。
+
+### Cross-Stage Lessons Memory（v0.1，借鉴 orchestra 的 findings.md 持久记忆）
+
+修订循环重蹈覆辙（已核验失败的 DOI 反复重试、上一轮已被驳回的反驳再次出场）的根因是阶段间只有产物交接、没有教训交接。`state_tracker` 维护一份 **lessons 记忆**（四段式，见 [`../agents/state_tracker_agent.md`](../agents/state_tracker_agent.md) § "Lessons Memory"）：
+
+1. **已知事实**（verified facts）——已核验为真的关键事实（如"DOI 10.x/yyy 无 OA 全文"）
+2. **模式与洞察**（patterns）——跨阶段观察到的规律
+3. **Lessons and Constraints**——可执行教训，每条以动词开头（如"勿再重试 DOI 10.x/yyy""R2 的统计质疑必须先补功效分析再回应"）
+4. **Open Questions**——未决问题
+
+search → paper → reviewer → re-review 各阶段在检查点**读**这份记忆（注入下一阶段输入），在完成时**写**新条目；重复踩到同一条 lesson 的 agent 由 orchestrator 记为流程缺陷并升级到用户。质量自测：读完 lessons 应能写出论文当前状态的摘要——写不出即说明记忆失效。
 
 ---
 
@@ -554,6 +600,9 @@ Explicit prohibitions to prevent common failure modes:
 | `../references/changelog-pipeline.md`                        | Full version history                                                                                                                                                                                                                           |
 | Stage 1 Output Convention（本文件 § "Stage 1 Output Convention"） | search 模块 → paper 模块的最小交接格式：文献清单 + 每篇标题/来源/本地路径                                                                                                                       |
 | `../agents/collaboration_depth_agent.md` § "Canonical Rubric" | Collaboration Depth Observer rubric (v1.0，已内联于该 agent 文件): 4 dimensions based on Wang & Zhang (2026) IJETHE 23:11                                                                                                                      |
+| [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) | 阶段交接物确定性校验门禁：literature-corpus / issue-ids / rr-matrix / failure-modes / passport 五个子命令（fail-closed） | orchestrator（阶段转换点）、CI |
+| [`../scripts/passport_tool.py`](../scripts/passport_tool.py) | Material Passport 边界快照 emit/validate/resume（JCS 规范化 SHA-256 哈希链） | orchestrator（FULL 检查点） |
+| [`../scripts/check_latex.py`](../scripts/check_latex.py) | LaTeX 编译前机械四查（缺失引用/缺图/重复图/重复章节 + chktex 定向抑噪） | formatter_agent（Stage 5 预检循环） |
 
 ---
 
@@ -587,7 +636,11 @@ The pipeline module dispatches the following suite modules (does not do work its
 
 Stage 1: search 模块（scripts/search_papers.py + scripts/download_paper.py）
   - --source auto: 单源快速检索（S2 → OpenAlex → arXiv 自动降级）
-  - --source multi: 多平台聚合检索，产物为 Literature Corpus 清单 + Markdown 全文
+  - --source multi: 多平台聚合检索（OpenAlex/Crossref/arXiv/DBLP/EuropePMC/OpenAIRE，CORE 有 Key 时并入），
+    产物为 Literature Corpus 清单 + Markdown 全文
+  - ChinaXiv（中科院预印本）无检索 API，但 download_paper.py 支持 10.12074 DOI /
+    chinaxiv.org 链接直达下载——用户点名中文预印本时走此路径
+  - 引用关系核验（citation-check / reviewer 证据）：scripts/citation_graph.py（OpenCitations）
   - 交接: Literature Corpus 作为 literature_strategist_agent 的输入语料
 
 Stage 2: paper 模块（reference/paper.md）
@@ -610,6 +663,11 @@ Stage 5: paper 模块 (format-convert mode)
   - Step 3: Produce LaTeX (using corresponding document class, e.g., apa7 class for APA 7.0)
   - Step 4: After user confirms content is correct, tectonic compiles PDF (final version)
   - Fonts: Times New Roman (English) + Source Han Serif TC VF (Chinese) + Courier New (monospace)
+  - Step 4 前置机械四查（v0.1，借鉴 AI-Scientist 编译门禁）：
+      python3 scripts/check_latex.py <主.tex 或目录> --chktex
+    四类确定性检查（缺失引用/缺图/重复图/重复章节 + 可选 chktex 定向抑噪）；
+    问题清单喂给 formatter_agent 修订后重跑，直到清零才允许编译（fail-closed 循环，
+    上限 3 轮，仍不清零则升级用户）。检查脚本只判断，改写永远由 formatter_agent 做。
   - ⚠️ IRON RULE: PDF must be compiled from LaTeX (HTML-to-PDF is prohibited)
 ```
 
@@ -630,7 +688,7 @@ Stage 5: paper 模块 (format-convert mode)
 | Item             | Content                                                                  |
 | ---------------- | ------------------------------------------------------------------------ |
 | Skill Version    | 3.11.0                                                                   |
-| Last Updated     | 2026-06-01                                                               |
+| Last Updated     | 2026-10-01                                                               |
 | 版本注记         | 本套件（liuxiang）四个模块统一版本 **3.11.0**；正文中保留的 `v3.2`–`v3.9.2` 等小版本号为沿用上游 ARS 文档的机制历史标注，不再作为套件版本 |
 | Maintainer       | Cheng-I Wu                                                               |
 | Dependent Modules | 本套件 search / paper / reviewer 模块（均随套件发布，无外部技能依赖） |

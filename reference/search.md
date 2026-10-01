@@ -5,7 +5,7 @@
 1. `scripts/search_papers.py` — 按主题或标题搜索论文，返回标题、作者、发表时间、摘要等列表
 2. `scripts/download_paper.py` — 下载一篇论文并转成 Markdown 文件
 
-搜索数据源（免费无需 Key，多源降级）：Semantic Scholar（主，覆盖广）→ OpenAlex（含开放获取 PDF）→ arXiv（预印本）。还可手动指定 Crossref（DOI 元数据）、PubMed（生物医学）、DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）。下载源见下。详见 [`../references/api_notes.md`](../references/api_notes.md)。
+搜索数据源（免费无需 Key，多源降级）：Semantic Scholar（主，覆盖广）→ OpenAlex（含开放获取 PDF）→ arXiv（预印本）。还可手动指定 Crossref（DOI 元数据）、PubMed（生物医学）、DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）、OpenAIRE（欧洲仓储聚合，Graph API v3）。下载源见下。详见 [`../references/api_notes.md`](../references/api_notes.md)。
 
 ### 环境准备
 
@@ -22,13 +22,13 @@ pip install requests pdfplumber pymupdf --break-system-packages -q
 ### 接口一：搜索论文
 
 ```bash
-python scripts/search_papers.py "<关键词或标题>" [--mode topic|title] [--source auto|multi|semanticscholar|openalex|crossref|pubmed|arxiv|dblp|europmc|core] [--limit 20] [--json]
+python scripts/search_papers.py "<关键词或标题>" [--mode topic|title] [--source auto|multi|semanticscholar|openalex|crossref|pubmed|arxiv|dblp|europmc|core|openaire] [--limit 20] [--json]
 ```
 
 - 主题搜索（默认）：`python scripts/search_papers.py "large language model reasoning"`
 - 按论文标题精确查找：`python scripts/search_papers.py "Attention Is All You Need" --mode title`
-- **多平台聚合（推荐，覆盖最广）**：`--source multi` 串行查 OpenAlex+Crossref+arXiv+DBLP+Europe PMC，结果合并去重并按来源轮转排序，保证各平台都有代表进入结果，而非单一平台独占前几名。
-- 指定单平台：`--source openalex`（含开放 PDF）/ `crossref`（DOI 权威）/ `pubmed`（生物医学）/ `arxiv`（预印本）/ `dblp`（CS 领域权威）/ `europmc`（生物医学全文）/ `core`（全球最大 OA 聚合库，需设置 `CORE_API_KEY` 环境变量）
+- **多平台聚合（推荐，覆盖最广）**：`--source multi` 串行查 OpenAlex+Crossref+arXiv+DBLP+Europe PMC+OpenAIRE，结果合并去重并按来源轮转排序，保证各平台都有代表进入结果，而非单一平台独占前几名。
+- 指定单平台：`--source openalex`（含开放 PDF）/ `crossref`（DOI 权威）/ `pubmed`（生物医学）/ `arxiv`（预印本）/ `dblp`（CS 领域权威）/ `europmc`（生物医学全文）/ `core`（全球最大 OA 聚合库，需设置 `CORE_API_KEY` 环境变量）/ `openaire`（欧洲仓储聚合，非英文文献覆盖好；注意其链接多为仓储落地页而非 PDF 直链，下载走 DOI 反查链更稳）
 - 需要程序化处理时用 `--json`，否则默认输出人类可读的列表
 
 `--source auto`（默认）依次尝试 S2→OpenAlex→arXiv，首个非空结果即返回——这样任一平台限流/无数据都不会阻断搜索。`--source multi` 则多平台都查并合并去重，覆盖面更广但耗时更长。默认 `--limit 20`。
@@ -50,6 +50,7 @@ python scripts/download_paper.py "<标识符>" -o output.md
 | arXiv ID | `2306.12345`、`arXiv:2306.12345v2`，也支持 2007 年前的旧格式 `hep-th/9901001` |
 | Semantic Scholar Paper ID | `649def34f8be52c8b66281af98ae884c09aef38b`（来自搜索结果里的 `semantic_scholar_id`） |
 | DOI | `10.1145/3025453.3025717` |
+| ChinaXiv ID/DOI/链接 | `202410.00098`、`10.12074/202410.00098`、`https://chinaxiv.org/abs/202410.00098`（中科院预印本，Crossref/OpenAlex 均不收录） |
 | 直接 PDF 链接 | `https://arxiv.org/pdf/2306.12345` |
 
 流程：解析标识符 → **先反查是否有 arXiv 版本（用户直接给 arXiv ID 时就是它本身；给 DOI / S2 ID 时，从 Semantic Scholar 的 `externalIds.ArXiv` 反查）**→ **有 arXiv 版本则优先下载 LaTeX 源码包并用 Pandoc 转成 Markdown，公式保留为标准 `$...$` / `$$...$$`（无损，结构最完整）；反查不到 arXiv 或只有 PDF（作者未提交源码、或 Pandoc 不可用）时降级用 `pymupdf` 提取 PDF 正文和图片** → 写出包含标题/作者/发表时间/来源/摘要/正文的 Markdown 文件。
@@ -97,9 +98,21 @@ python scripts/pdf2md.py <pdf文件路径或URL> [paper_id] [--output output.md]
 - 图片提取到输出文件同级的 `images/` 目录，Markdown 中以相对路径引用
 - 转换后端优先级：pandoc（含 `--extract-media`）→ pymupdf（文本+图片）→ pdfminer.six → pdftotext → 原始文本
 
-**重要限制**：只有"开放获取"（open access）的论文才能下载全文。如果一篇论文没有免费 PDF（比如很多期刊付费墙文章），脚本会报错并说明原因——这种情况下可以把接口一返回的摘要信息直接整理给用户，不要假装下载成功。
+**重要限制**：只有"开放获取"（open access）的论文才能下载全文。如果一篇论文没有免费 PDF（比如很多期刊付费墙文章），脚本会报错并说明原因——这种情况下可以把接口一返回的摘要信息直接整理给用户，不要假装下载成功。ChinaXiv 条目若无挂载全文（或站点维护/反爬拦截），脚本同样显性报错——此时只有元数据与摘要可用，把摘要整理给用户，不要编造全文。
 
 下载完成后用 `present_files` 把生成的 `.md` 文件交给用户，不要只在对话里贴一遍全文。
+
+### 接口四：引用关系查询（OpenCitations 引用图谱）
+
+`scripts/citation_graph.py` 按 DOI 查 OpenCitations（CC0）的引用边，服务两个场景：citation-check 核对论文自身参考文献、reviewer 证据核验（谁引用了它）。OpenCitations 只做 DOI→引用边的确定性查询，不做关键词检索——检索找论文（接口一），本脚本核引用。
+
+```bash
+python scripts/citation_graph.py 10.1145/3025453.3025717                    # 双向：被引 + 参考文献
+python scripts/citation_graph.py doi:10.1145/3025453.3025717 --direction citations   # 只看被引
+python scripts/citation_graph.py https://doi.org/10.1145/x --json           # 程序化处理
+```
+
+注意：COCI 以 Crossref/OpenAlex 收录为前提，ChinaXiv 等 ISTIC 注册 DOI 查不到（返回空，不是错误）。
 
 ### 典型工作流程
 
@@ -114,6 +127,8 @@ python scripts/pdf2md.py <pdf文件路径或URL> [paper_id] [--output output.md]
 - 扫描版 PDF（图片型，无文字层）提取不出正文，只能拿到标题/摘要，需要额外 OCR。
 - Semantic Scholar 无 Key 时是共享限流池，短时间大量请求可能被限速；`search_papers.py` 在其失败时会自动降级到 arXiv。
 - arXiv 只覆盖预印本，搜不到已发表期刊论文的最终版；这种情况下换回 Semantic Scholar 或直接给 DOI。
+- ChinaXiv 无公开检索 API（旧版 OAI-PMH 已随 2.0 改版失效，站内检索对脚本反爬），只能按 DOI/链接直达下载；其 10.12074 DOI 由 ISTIC 注册，Crossref/OpenAlex 结构性不收录，检索覆盖需换 OpenAIRE 或 AMiner。全文下载端点偶发维护/反爬 403，脚本会显性报错并降级为"仅元数据+摘要"。
+- citation_graph（OpenCitations）以 Crossref/OpenAlex 收录为前提，ISTIC 注册 DOI 与极新论文查不到引用边（返回空，不是错误）。
 - 更多 API 细节（字段含义、错误处理、限流数值）见 [`../references/api_notes.md`](../references/api_notes.md)，一般不需要主动读，除非遇到报错需要排查。
 
 ---

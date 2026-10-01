@@ -40,8 +40,10 @@ Review this paper: [paste paper or provide file]
 | Scenario                                              | Module to Use                     |
 | ----------------------------------------------------- | -------------------------------- |
 | Need to write a paper (not review)                    | paper 模块（[`reference/paper.md`](paper.md)）                 |
-| Need to search / download papers                      | search 模块（[`reference/search.md`](search.md)）             |
+| Need to search / download papers (as the primary task) | search 模块（[`reference/search.md`](search.md)）             |
 | Need to revise a paper (already have review comments) | paper 模块（revision 模式） |
+
+（评审**内部**的背景证据检索不在此列：`full` 模式可按 [`../references/review_retrieval_protocol.md`](../references/review_retrieval_protocol.md) 调用 search 模块脚本拉取证据，检索器是 search，判断仍是评审员。）
 
 ### Quick Mode Selection Guide
 
@@ -187,7 +189,13 @@ The v3.6.2 Sprint Contract Protocol (paper-blind Phase 1 + paper-visible Phase 2
 
 Routing into Mode B requires an explicit user signal — a `[direct-mode]` prefix or an explicit `$ARGUMENTS` selection（见 [`../SKILL.md`](../SKILL.md) 模块路由）. Ambiguous cross-phase input defaults to clarification before any phase runs.
 
-**Enforcement:** prompt-level via Phase Boundary blocks on Bucket A agents. ⚠️ 依赖缺失，当前版本未实现：上游 ARS 的 advisory verifier（`scripts/check_pipeline_integrity.py`）、deterministic PreToolUse hook、multi-phase envelope 均未随本套件发布。
+**Enforcement:** prompt-level via Phase Boundary blocks on Bucket A agents. 阶段交接物的确定性校验由 [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) 提供（`issue-ids` / `rr-matrix` 子命令覆盖本模块产物；评审完成后 orchestrator 调用，校验不过不得进入下一阶段）。⚠️ 依赖缺失，当前版本未实现：deterministic PreToolUse hook、multi-phase envelope 未随本套件发布，仍以 prompt 级约束为准。
+
+---
+
+## Retrieval-Augmented Review (opt-in, v0.1)
+
+`full` 模式可在评审前按 [`../references/review_retrieval_protocol.md`](../references/review_retrieval_protocol.md) 执行两步检索增强：评审员提出 ≤6 个背景核验问题 → `scripts/search_papers.py` / `scripts/citation_graph.py` 检索证据（确定性脚本，不走模型）→ Evidence Dossier 注入 Phase 1 后带证据评审。检索失败回退单轮评审并在 Limitations 声明。参与提问的 agent：`field_analyst`（主）+ `methodology_reviewer` + `domain_reviewer`（辅）。
 
 ---
 
@@ -344,6 +352,7 @@ search 模块 --> paper 模块 --> [integrity check] --> reviewer 模块 --> pap
 | `../references/re_review_mode_protocol.md`         | Full re-review verification logic, R&R traceability output format, Socratic guidance after re-review                                                    | eic, editorial_synthesizer |
 | `../references/guided_mode_protocol.md`            | Guided mode dialogue flow, progressive revelation sequence, dialogue rules                                                                              | all reviewers              |
 | `../references/calibration_mode_protocol.md`       | Calibration mode: FNR/FPR/balanced accuracy measurement against user-supplied gold set, ensembling（受规则6硬上限：金标 ≤3 篇、每篇 ≤2 次）, session-scoped confidence disclosure (v3.2)      | all reviewers              |
+| `../references/review_retrieval_protocol.md`       | Retrieval-augmented review: 评审前背景核验问题 + search/citation_graph 脚本检索 + Evidence Dossier（v0.1，full 模式 opt-in）                                                                  | field_analyst, methodology_reviewer, domain_reviewer |
 | `../references/integration_guide.md`               | Complete 9-step pipeline usage example                                                                                                                  | —                          |
 | `../references/changelog-reviewer.md`                       | Full version history                                                                                                                                    | —                          |
 
@@ -437,7 +446,7 @@ Follows the paper's language. Academic terms remain in English. User can overrid
 | Item             | Content                                                |
 | ---------------- | ------------------------------------------------------ |
 | Skill Version    | 3.11.0（套件统一版本；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注） |
-| Last Updated     | 2026-06-01                                             |
+| Last Updated     | 2026-10-01 |
 | Maintainer       | Cheng-I Wu                                             |
 | Dependent Modules | paper 模块（upstream/downstream integration）           |
 | Role             | Multi-perspective academic paper review simulator      |
