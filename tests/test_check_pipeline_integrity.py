@@ -131,6 +131,19 @@ class TestIssueIds(unittest.TestCase):
         self.assertTrue(result["pass"])
         self.assertTrue(any("XX-3" in w for w in result["warnings"]))
 
+    def test_malformed_panel_prefix_warns(self):
+        # 真实场景回归：R9-0（panel 形状但 R 编号非法）此前被静默忽略，必须警告
+        path = write_tmp("R9-0 与 R4-2 都是非法来源")
+        try:
+            result = cpi.check_issue_ids(path, require_ids=False)
+        finally:
+            os.unlink(path)
+        self.assertTrue(result["pass"])  # 警告不阻断
+        joined = "\n".join(result["warnings"])
+        self.assertIn("R9-0", joined)
+        self.assertIn("R4-2", joined)
+        self.assertIn("非法", joined)
+
     def test_gap_numbering_warns(self):
         path = write_tmp("R2-1 R2-3")
         try:

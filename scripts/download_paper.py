@@ -452,7 +452,9 @@ def resolve_metadata(identifier: str):
 def download_pdf(pdf_url: str) -> str:
     # SSRF 防护同样适用于远程元数据接口（S2 openAccessPdf / Unpaywall）返回的链接
     validate_public_http_url(pdf_url)
-    resp = _get_with_retry(pdf_url, timeout=60)
+    # timeout 300s：正文页 60s 足够，但 PDF 常有 10-50MB（实测 10.7MB 在
+    # ~120KB/s 网络下需 92s，60s 会误杀正常下载）
+    resp = _get_with_retry(pdf_url, timeout=300)
     if resp.status_code == 403:
         # 去标签 + 去 ANSI 转义/控制字符，防止响应体伪装终端输出
         snippet = _decode_response(resp)
@@ -979,7 +981,8 @@ def main():
             except OSError:
                 pass
 
-    markdown = build_markdown(meta, body, args.identifier, conversion)
+    # 来源标识优先用解析出的规范 DOI（如 ChinaXiv 条目解析出 10.12074/...），入口标识兜底
+    markdown = build_markdown(meta, body, meta.get("doi") or args.identifier, conversion)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(markdown)

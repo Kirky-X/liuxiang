@@ -410,6 +410,60 @@ class TestChinaXiv(unittest.TestCase):
                 dp.resolve_chinaxiv("199999.99999")
 
 
+class TestChinaXivFullChain(unittest.TestCase):
+    """ChinaXiv 完整下载链路闭环：abs 页解析 → PDF 下载 → pymupdf 转换 → Markdown 落盘。
+
+    站点下载端点长期维护（403），无法真实打通；这里 mock HTTP 层（abs 页用真实
+    HTML fixture、PDF 用 pymupdf 生成的真字节流），转换代码全部走真实实现。
+    """
+
+    def test_end_to_end_produces_markdown(self):
+        import tempfile as tf
+
+        import pymupdf
+
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "ChinaXiv Full-Chain Test Paper")
+        page.insert_text((72, 100), "This body text must survive the PDF->Markdown conversion.")
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        workdir = tf.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(workdir, ignore_errors=True))
+
+        calls = {"n": 0}
+
+        def fake_get(url, params=None, timeout=15):
+            calls["n"] += 1
+            if "/abs/" in url:
+                return FakeChinaXivResp(text=CHINAXIV_PAGE)
+            if "download.htm" in url and "filetype=pdf" in url:
+                resp = FakeChinaXivResp(text="")
+                resp.status_code = 200
+                resp.content = pdf_bytes
+                return resp
+            raise AssertionError(f"意外请求: {url}")
+
+        out = os.path.join(workdir, "paper.md")
+        with mock.patch.object(dp, "_get_with_retry", side_effect=fake_get), \
+             mock.patch.dict(sys.modules, {}):
+            argv = [sys.executable, "-B", dp.__file__ if hasattr(dp, "__file__") else "", "202410.00098", "-o", out]
+        # 直接以函数级驱动 main 逻辑（避免子进程 mock 失效），复用脚本 main 的路径
+        from unittest import mock as _m
+        with _m.patch.object(sys, "argv", ["download_paper.py", "202410.00098", "-o", out]), \
+             _m.patch.object(dp, "_get_with_retry", side_effect=fake_get):
+            dp.main()
+        self.assertTrue(os.path.isfile(out))
+        md = open(out, encoding="utf-8").read()
+        self.assertIn("所谓影响关系有待商榷", md)
+        self.assertIn("温忠麟等人（2024）", md)
+        self.assertIn("ChinaXiv Full-Chain Test Paper", md)
+        self.assertIn("ChinaXiv（中科院预印本）", md)
+        self.assertIn("10.12074/202410.00098", md)
+        self.assertEqual(calls["n"], 2)  # abs 页 + 下载端点，各一次
+
+
 class TestCliSmoke(unittest.TestCase):
     def test_help(self):
         r = subprocess.run(

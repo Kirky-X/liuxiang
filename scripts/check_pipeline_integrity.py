@@ -42,6 +42,8 @@ KNOWN_SOURCES = set(PANEL_SOURCES) | set(NONPANEL_SOURCES)
 KNOWN_ID_RE = re.compile(r"\b(EIC|R[1-3]|DA|IP|EX)-(\d{1,2})\b")
 # 疑似但前缀未知的编号（用于警告，如 XX-3）
 ANY_ID_RE = re.compile(r"\b([A-Z]{2,4})-(\d{1,2})\b")
+# panel 形状但前缀非法（如 R9-0：R 后数字不在 1-3）——静默放过会让改号丢失不可见
+MALFORMED_PANEL_RE = re.compile(r"\b(R(?![1-3])\d|EIC|DA|IP|EX)-(\d{1,2})\b")
 
 # ---------------------------------------------------------------------------
 # 7-mode 清单（references/ai_research_failure_modes.md）
@@ -143,6 +145,10 @@ def check_issue_ids(path: str, require_ids: bool) -> dict:
         if m.span() in known_spans or m.group(1) in KNOWN_SOURCES:
             continue
         warnings.append(f"未知来源前缀的疑似 Issue ID: {m.group(0)}（panel 前缀 EIC/R1/R2/R3/DA，非 panel 前缀 IP/EX）")
+    for m in MALFORMED_PANEL_RE.finditer(text):
+        if m.span() in known_spans:
+            continue
+        warnings.append(f"panel 形状但来源前缀非法: {m.group(0)}（R 仅允许 R1/R2/R3；若为笔误请修正，防止改号静默丢失）")
     if not valid:
         msg = "未找到任何合法 Issue ID"
         if require_ids:

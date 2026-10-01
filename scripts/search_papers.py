@@ -375,6 +375,11 @@ def search_dblp(query: str, limit: int, mode: str):
         "h": min(limit, 1000),
     }
     resp = _get_with_retry(DBLP_API_URL, params, timeout=15)
+    # DBLP 对非浏览器请求返回 Anubis 人机验证页（HTTP 200 + HTML），不是 JSON；
+    # 显性识别比"无法解析的内容"更可行动：这是站点侧拦截，重试无用
+    if "text/html" in resp.headers.get("Content-Type", ""):
+        raise RuntimeError("DBLP 返回了人机验证页（Anubis 反爬拦截），脚本无法访问。"
+                           "请改用 OpenAlex/Crossref（覆盖面相近），或稍后在浏览器可用的环境重试。")
     try:
         data = resp.json()
     except ValueError as e:
@@ -452,11 +457,15 @@ def search_europmc(query: str, limit: int, mode: str):
                 if ftu.get("availabilityCode") in ("O", "F") and ftu.get("documentStyle") == "pdf":
                     pdf_url = ftu.get("url")
                     break
+        # Europe PMC 摘要常含 JATS HTML 标签（如 <h4>），与 Crossref 同样去标签
+        abstract = rec.get("abstractText")
+        if abstract:
+            abstract = re.sub(r"<[^>]+>", "", abstract).strip()
         results.append(_norm_result(
             title=rec.get("title"),
             authors=authors,
             published=rec.get("firstPublicationDate"),
-            abstract=rec.get("abstractText"),
+            abstract=abstract,
             venue=rec.get("journalTitle"),
             doi=doi,
             pmid=rec.get("pmid"),

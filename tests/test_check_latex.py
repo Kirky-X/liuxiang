@@ -180,6 +180,43 @@ class TestChktex(unittest.TestCase):
         self.assertEqual(r["suppressed_ids"], [2, 24, 13, 1])
 
 
+class TestChktexRealSubprocess(unittest.TestCase):
+    """chktex 集成机制测试：真实子进程 spawn + 官方输出格式解析。
+
+    CI 环境无 chktex 二进制（无法 apt 安装），用 stub 脚本按 chktex 的真实
+    输出格式（"Warning N in M, line K: message"）走完整 subprocess 链路，
+    验证：二进制定位、-n<id> 抑制参数传递、stdout 逐行解析。
+    输出格式本身与真实 chktex 的一致性是文档化假设（AI-Scientist 同款格式）。
+    """
+
+    def test_spawn_and_parse_with_suppression_flags(self):
+        import tempfile as tf
+        stub_dir = tf.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(stub_dir, ignore_errors=True))
+        stub = os.path.join(stub_dir, "chktex")
+        args_file = os.path.join(stub_dir, "args.txt")
+        with open(stub, "w", encoding="utf-8") as f:
+            # 把收到的参数写入文件供断言；按 chktex 官方格式输出两条告警
+            f.write(f"""#!/bin/sh
+echo "$@" > {args_file}
+echo "Warning 2 in 1, line 14: Command terminated with space."
+echo "Warning 5 in 1, line 30: Double hyphen expected here."
+exit 0
+""")
+        os.chmod(stub, 0o755)
+        with mock.patch.dict(os.environ, {"PATH": stub_dir + os.pathsep + os.environ.get("PATH", "")}):
+            r = cl.run_chktex("main.tex", [2, 24, 13, 1])
+        self.assertEqual(r["severity"], "warning")
+        self.assertEqual(len(r["warnings"]), 2)
+        self.assertEqual(r["warnings"][0]["type"], 2)
+        self.assertEqual(r["warnings"][1]["line"], 30)
+        # 抑制 ID 以 -n<N> 形式传给二进制，目标文件在参数末尾
+        argv = open(args_file, encoding="utf-8").read().split()
+        self.assertEqual(argv[-1], "main.tex")
+        for sid in ("2", "24", "13", "1"):
+            self.assertIn(f"-n{sid}", argv)
+
+
 class TestEndToEnd(unittest.TestCase):
     def write_project(self, tex: str, bib: str | None = None):
         tmp = tempfile.mkdtemp()

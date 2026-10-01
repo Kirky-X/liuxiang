@@ -37,10 +37,11 @@ ATOM_FEED = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 class FakeResp:
-    def __init__(self, status_code=200, text="", payload=None):
+    def __init__(self, status_code=200, text="", payload=None, headers=None):
         self.status_code = status_code
         self.text = text
         self._payload = payload
+        self.headers = headers or {"Content-Type": "application/json"}
 
     def json(self):
         if self._payload is None:
@@ -263,6 +264,15 @@ class TestSearchDblp(unittest.TestCase):
         self.assertEqual(r["pdf_url"], "https://doi.org/10.1/d.pdf")
         self.assertEqual(r["page_url"], "https://dblp.org/rec/x")
         self.assertEqual(r["source"], "dblp")
+
+    def test_anubis_bot_challenge_rejected_explicitly(self):
+        # 真实冒烟发现：DBLP 对脚本请求返回 Anubis 人机验证页（HTTP 200 + HTML）。
+        # 必须显性报"反爬拦截"而不是"无法解析的内容"，且 multi 聚合可优雅跳过
+        challenge = FakeResp(text="<!doctype html><title>Making sure you're not a bot!</title>",
+                             headers={"Content-Type": "text/html; charset=utf-8"})
+        with mock.patch.object(sp, "_get_with_retry", return_value=challenge):
+            with self.assertRaisesRegex(RuntimeError, "反爬拦截"):
+                sp.search_dblp("q", 5, "topic")
 
 
 class TestRunSearchAutoDegrades(unittest.TestCase):
