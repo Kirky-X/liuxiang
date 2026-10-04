@@ -1,9 +1,11 @@
 # search 模块：论文搜索与下载
 
-两个独立脚本接口，分别对应"搜索"和"下载"：
+四个独立脚本接口：
 
-1. `scripts/search_papers.py` — 按主题或标题搜索论文，返回标题、作者、发表时间、摘要等列表
-2. `scripts/download_paper.py` — 下载一篇论文并转成 Markdown 文件
+1. `scripts/search_papers.py` — 按主题或标题搜索论文，返回标题、作者、发表时间、摘要等列表（接口一）
+2. `scripts/download_paper.py` — 下载一篇论文并转成 Markdown 文件（接口二）
+3. `scripts/pdf2md.py` — 本地 PDF 转 Markdown，含图片提取（接口三）
+4. `scripts/citation_graph.py` — 按 DOI 查 OpenCitations 引用关系（接口四）
 
 搜索数据源（免费无需 Key，多源降级）：Semantic Scholar（主，覆盖广）→ OpenAlex（含开放获取 PDF）→ arXiv（预印本）。还可手动指定 Crossref（DOI 元数据）、PubMed（生物医学）、DBLP（CS 领域权威）、Europe PMC（生物医学全文）、CORE（全球最大 OA 聚合库，需 Key）、OpenAIRE（欧洲仓储聚合，Graph API v3）。下载源见下。详见 [`../references/api_notes.md`](../references/api_notes.md)。
 
@@ -12,12 +14,12 @@
 首次使用前确认依赖已安装：
 
 ```bash
-pip install requests pdfplumber pymupdf --break-system-packages -q
+pip install requests defusedxml pymupdf --break-system-packages -q
 ```
 
-这两个脚本需要访问外网（`api.semanticscholar.org` / `api.openalex.org` / `api.crossref.org` / `eutils.ncbi.nlm.nih.gov` / `export.arxiv.org` / `arxiv.org` / `dblp.org` / `www.ebi.ac.uk` / `api.core.ac.uk` / `api.unpaywall.org`）。如果当前环境的网络策略不允许访问这些域名（`bash` 报 `host_not_allowed` 或类似拒绝信息），先告知用户，并建议其在允许联网的环境（本地终端 / Claude Code）中运行——不要假装成功或编造结果。
+这些脚本需要访问外网（`api.semanticscholar.org` / `api.openalex.org` / `api.crossref.org` / `eutils.ncbi.nlm.nih.gov` / `export.arxiv.org` / `arxiv.org` / `dblp.org` / `www.ebi.ac.uk` / `api.core.ac.uk` / `api.openaire.eu` / `api.unpaywall.org` / `chinaxiv.org` / `opencitations.net`）。如果当前环境的网络策略不允许访问这些域名（`bash` 报 `host_not_allowed` 或类似拒绝信息），先告知用户，并建议其在允许联网的环境（本地终端 / Claude Code）中运行——不要假装成功或编造结果。
 
-两个脚本内置了瞬时错误重试（429/5xx 自动重试2次，指数退避），单次失败不代表真的不可用，可以先重跑一次。
+search / download / citation_graph 三个脚本内置了瞬时错误重试（429/5xx 自动重试2次，指数退避），单次失败不代表真的不可用，可以先重跑一次。
 
 ### 接口一：搜索论文
 
@@ -125,7 +127,7 @@ python scripts/citation_graph.py https://doi.org/10.1145/x --json           # �
 - **PDF 提取路径（降级时）无法保留 LaTeX 公式**：数学符号会退化成纯文本、双栏排版可能交错。无论用户给的是 arXiv ID、DOI 还是 S2 ID，只要反查到 arXiv 版本就优先走 LaTeX 源码路径避免此问题；Pandoc 不可用时可用上面的 `html2md.py` 从 HTML 版本提取公式（备用转换器），仅当论文确实没有 arXiv 版本且只有付费/无源 PDF 时才会降级到 PDF 提取，此时公式质量有限。
 
 - 扫描版 PDF（图片型，无文字层）提取不出正文，只能拿到标题/摘要，需要额外 OCR。
-- Semantic Scholar 无 Key 时是共享限流池，短时间大量请求可能被限速；`search_papers.py` 在其失败时会自动降级到 arXiv。
+- Semantic Scholar 无 Key 时是共享限流池，短时间大量请求可能被限速；`search_papers.py` 在其失败时会自动降级到 OpenAlex，再降级到 arXiv。
 - arXiv 只覆盖预印本，搜不到已发表期刊论文的最终版；这种情况下换回 Semantic Scholar 或直接给 DOI。
 - ChinaXiv 无公开检索 API（旧版 OAI-PMH 已随 2.0 改版失效，站内检索对脚本反爬），只能按 DOI/链接直达下载；其 10.12074 DOI 由 ISTIC 注册，Crossref/OpenAlex 结构性不收录，检索覆盖需换 OpenAIRE 或 AMiner。全文下载端点偶发维护/反爬 403，脚本会显性报错并降级为"仅元数据+摘要"。
 - citation_graph（OpenCitations）以 Crossref/OpenAlex 收录为前提，ISTIC 注册 DOI 与极新论文查不到引用边（返回空，不是错误）。

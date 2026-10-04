@@ -159,7 +159,7 @@ Advisory only — your pipeline continues regardless. Full rubric: agents/collab
 |---|---|---|---|---|---|
 | 1 | … | …/10 | …/10 | …/10 | one-line observation with turn citation |
 | 2 | … | … | … | … | … |
-| … |
+| … | … | … | … | … | … |
 
 ### Whole-pipeline observation
 [2–4 sentences: what pattern emerged across stages; where the shape changed; what did not]

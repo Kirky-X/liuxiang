@@ -587,7 +587,7 @@ Explicit prohibitions to prevent common failure modes:
 | `../references/plagiarism_detection_protocol.md`    | Phase D originality verification protocol + self-plagiarism + AI text characteristics                                                                                                                                                          |
 | `../references/mode_advisor.md`                     | Unified cross-skill decision tree: maps user intent to optimal skill + mode                                                                                                                                                                    |
 | `../references/claim_verification_protocol.md`      | Phase E claim verification protocol: claim extraction, source tracing, cross-referencing, verdict taxonomy                                                                                                                                     |
-| `../references/claim_audit_calibration_protocol.md` | v3.8 #103 claim_ref_alignment audit calibration: gold-set shape (T-C3), threshold gates FNR<0.15 / FPR<0.10 (T-C1), per-class FNR/FPR reporting (T-C2). ⚠️ 依赖缺失，当前版本未实现：配套测试 `scripts/test_claim_audit_calibration.py` 未随本套件发布。 |
+| `../references/claim_audit_calibration_protocol.md` | v3.8 #103 claim_ref_alignment audit calibration: gold-set shape (T-C3), threshold gates FNR<0.15 / FPR<0.10 (T-C1), per-class FNR/FPR reporting (T-C2). 配套测试 `scripts/test_claim_audit_calibration.py` 与金标 fixture（`scripts/fixtures/claim_audit_calibration/gold_set.json`）已随本套件发布。 |
 | `../references/ai_research_failure_modes.md`        | 7-mode AI research failure checklist (Lu 2026), run at Stage 2.5 + 4.5 with blocking behaviour, reported at Stage 6                                                                                                                            |
 | `../references/team_collaboration_protocol.md`      | Multi-person team coordination: role definitions, handoff protocol, version control, conflict resolution                                                                                                                                       |
 | `../references/integrity_review_protocol.md`        | Stage 2.5 + 4.5 integrity verification: 5-phase protocol details                                                                                                                                                                               |
@@ -600,9 +600,9 @@ Explicit prohibitions to prevent common failure modes:
 | `../references/changelog-pipeline.md`                        | Full version history                                                                                                                                                                                                                           |
 | Stage 1 Output Convention（本文件 § "Stage 1 Output Convention"） | search 模块 → paper 模块的最小交接格式：文献清单 + 每篇标题/来源/本地路径                                                                                                                       |
 | `../agents/collaboration_depth_agent.md` § "Canonical Rubric" | Collaboration Depth Observer rubric (v1.0，已内联于该 agent 文件): 4 dimensions based on Wang & Zhang (2026) IJETHE 23:11                                                                                                                      |
-| [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) | 阶段交接物确定性校验门禁：literature-corpus / issue-ids / rr-matrix / failure-modes / passport 五个子命令（fail-closed） | orchestrator（阶段转换点）、CI |
-| [`../scripts/passport_tool.py`](../scripts/passport_tool.py) | Material Passport 边界快照 emit/validate/resume（JCS 规范化 SHA-256 哈希链） | orchestrator（FULL 检查点） |
-| [`../scripts/check_latex.py`](../scripts/check_latex.py) | LaTeX 编译前机械四查（缺失引用/缺图/重复图/重复章节 + chktex 定向抑噪） | formatter_agent（Stage 5 预检循环） |
+| [`../scripts/check_pipeline_integrity.py`](../scripts/check_pipeline_integrity.py) | 阶段交接物确定性校验门禁：literature-corpus / issue-ids / rr-matrix / failure-modes / passport 五个子命令（fail-closed）；调用方：orchestrator（阶段转换点）、CI |
+| [`../scripts/passport_tool.py`](../scripts/passport_tool.py) | Material Passport 边界快照 emit/validate/resume（JCS 规范化 SHA-256 哈希链）；调用方：orchestrator（FULL 检查点） |
+| [`../scripts/check_latex.py`](../scripts/check_latex.py) | LaTeX 编译前机械四查（缺失引用/缺图/重复图/重复章节 + chktex 定向抑噪）；调用方：formatter_agent（Stage 5 预检循环） |
 
 ---
 
@@ -687,9 +687,9 @@ Stage 5: paper 模块 (format-convert mode)
 
 | Item             | Content                                                                  |
 | ---------------- | ------------------------------------------------------------------------ |
-| Skill Version    | 3.11.0                                                                   |
+| Skill Version    | 0.1.3                                                                    |
 | Last Updated     | 2026-10-01                                                               |
-| 版本注记         | 本套件（liuxiang）四个模块统一版本 **3.11.0**；正文中保留的 `v3.2`–`v3.9.2` 等小版本号为沿用上游 ARS 文档的机制历史标注，不再作为套件版本 |
+| 版本注记         | 本套件（liuxiang）四个模块统一版本 **0.1.3**（与 skill.json / git tag v0.1.3 一致）；正文中保留的 `v3.2`–`v3.9.2` 等小版本号为沿用上游 ARS 文档的机制历史标注，不再作为套件版本 |
 | Maintainer       | Cheng-I Wu                                                               |
 | Dependent Modules | 本套件 search / paper / reviewer 模块（均随套件发布，无外部技能依赖） |
 | Role             | Full academic research workflow orchestrator                             |

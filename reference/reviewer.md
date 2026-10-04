@@ -445,7 +445,7 @@ Follows the paper's language. Academic terms remain in English. User can overrid
 
 | Item             | Content                                                |
 | ---------------- | ------------------------------------------------------ |
-| Skill Version    | 3.11.0（套件统一版本；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注） |
+| Skill Version    | 0.1.3（套件统一版本，与 skill.json / git tag v0.1.3 一致；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注） |
 | Last Updated     | 2026-10-01 |
 | Maintainer       | Cheng-I Wu                                             |
 | Dependent Modules | paper 模块（upstream/downstream integration）           |

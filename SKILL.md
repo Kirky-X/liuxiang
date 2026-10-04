@@ -43,7 +43,7 @@ search (检索下载原始论文) → paper (写作) → integrity 审查 → re
 
 ---
 
-## search 模块速览（3 条核心命令）
+## search 模块速览（4 条核心命令）
 
 详细用法（数据源选择、标识符类型、备用转换器、已知局限、handoff 格式）**Read [`reference/search.md`](reference/search.md)**。
 

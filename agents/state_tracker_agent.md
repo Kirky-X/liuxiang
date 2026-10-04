@@ -49,7 +49,7 @@ Every material artifact produced by the pipeline carries a version label. These 
 |----------|---------------|---------|-----------------|
 | Research output | `research_v{N}` | `research_v1` (initial), `research_v2` (after keyword expansion) | Schema 1-3 |
 | Paper draft | `paper_draft_v{N}` | `paper_draft_v1` (initial), `paper_draft_v2` (post-review revision) | Schema 4 |
-| Integrity report | `integrity_{mid|final}_v{N}` | `integrity_mid_v1`, `integrity_final_v1` | Schema 5 |
+| Integrity report | `integrity_{mid\|final}_v{N}` | `integrity_mid_v1`, `integrity_final_v1` | Schema 5 |
 | Review report | `review_v{N}` | `review_v1` (initial review), `review_v2` (re-review after revision) | Schema 6 |
 | Revision roadmap | `roadmap_v{N}` | `roadmap_v1` (first review), `roadmap_v2` (re-review) | Schema 7 |
 | Revision | `revision_v{N}` | `revision_v1` (first revision round) | Schema 8 |

@@ -19,7 +19,7 @@
 
 - **无损转换**：下载优先走 arXiv LaTeX 源码路径（tarball → Pandoc，公式保留 `$...$`/`$$...$$`），失败降级 PDF 提取（pymupdf），再降级 arXiv HTML 备用转换器；DOI / S2 ID 自动反查 arXiv 版本
 - **安全加固**：`download_paper.py` 带 SSRF 防护（scheme 白名单 + 拒绝解析到内网/链路本地的目标）与 tar 安全解压（拒绝路径穿越、symlink、非普通文件成员）
-- **修后状态**：SKILL.md 瘦身至 3.8KB，search 详细用法外置 `reference/search.md`；约 130 处悬空引用已处理——90 处改指真实资产，其余 49 处（13 个文件）显式标注「⚠️ 依赖缺失，当前版本未实现」（上游 ARS 的 shared 契约、compliance/raise 框架等无等价物），未标注残留为 0
+- **修后状态**：SKILL.md 瘦身至 4.6KB，search 详细用法外置 `reference/search.md`；约 140 处悬空引用已处理——90 处改指真实资产，其余 49 处（13 个文件）显式标注「⚠️ 依赖缺失，当前版本未实现」（上游 ARS 的 shared 契约、compliance/raise 框架等无等价物），未标注残留为 0
 - **search → paper/pipeline 衔接**：search 产物（Markdown 全文清单）是 paper 模块文献策略 agent 与 pipeline Stage 1 的输入语料，交接格式见 `reference/search.md` §「与其他模块的衔接」
 
 ## 📦 安装
@@ -35,7 +35,7 @@ cp -r /path/to/liuxiang ~/.zcode/skills/liuxiang
 npx skills add Kirky-X/liuxiang --agent claude-code -y
 ```
 
-依赖：Python 3.8+ 与 `requests httpx beautifulsoup4 lxml pdfminer.six pymupdf`（`pip install` 即可，搜索类 API 免费、无需 Key）；Pandoc 为 LaTeX 无损路径的可选依赖。
+依赖：Python 3.8+ 与 `requests defusedxml beautifulsoup4 lxml pdfminer.six pymupdf`（`pip install` 即可，搜索类 API 免费、无需 Key）；`pypandoc-binary`（Pandoc）为 LaTeX 无损路径的可选依赖。
 
 ## 🚀 快速开始
 
@@ -56,9 +56,9 @@ python3 scripts/pdf2md.py ~/papers/attention.pdf -o attention.md
 
 ## ✅ 测试与验证
 
-2026-09-13 实测（v0.1.1，与 git tag 一致）：
+2026-09-13 实测（v0.1.1 时点；现版本 0.1.3，与最新 git tag v0.1.3 一致）：
 
-- **语法**：4 个 Python 脚本 `py_compile` 全部通过
+- **语法**：12 个 Python 脚本 `py_compile` 全部通过（2026-10-04 复测）
 - **功能**：
   - `search_papers.py "attention is all you need" --mode title --limit 3` 真实返回 3 条结果（Semantic Scholar 429 → 自动降级 OpenAlex）
   - `pdf2md.py` 对本地生成的 PDF 端到端转换成功，输出含 frontmatter 与正文
@@ -70,13 +70,15 @@ python3 scripts/pdf2md.py ~/papers/attention.pdf -o attention.md
 
 ```
 liuxiang/
-├── SKILL.md            # 3.8KB 入口：四模块路由 + search 速览
-├── skill.json          # v0.1.1, MIT
-├── scripts/            # search_papers.py / download_paper.py / pdf2md.py / html2md.py
+├── SKILL.md            # 4.6KB 入口：四模块路由 + search 速览
+├── skill.json          # v0.1.3, MIT
+├── scripts/            # 12 个脚本：search_papers.py / download_paper.py / pdf2md.py / html2md.py / citation_graph.py / passport_tool.py / check_inventory.py / check_latex.py / check_pipeline_integrity.py / mdtables.py / skill_lint.py / test_claim_audit_calibration.py
 ├── reference/          # 四模块流程文档（search / paper / reviewer / pipeline）
-├── references/         # 58 篇协议与规范（引用格式 / 评审标准 / 流水线状态机 …）
+├── references/         # 61 篇协议与规范（引用格式 / 评审标准 / 流水线状态机 …，index.md 为导航索引）
 ├── agents/             # 24 个 agent 定义（paper 12 + reviewer 7 + orchestrator 等）
 ├── templates/          # 14 个输出模板（IMRaD / 评审报告 / 修订跟踪 …）
+├── tests/              # 9 个 pytest 单测（对应 9 个脚本）+ SKIPPED.md
+├── triggers/           # trigger-queries.json 触发评估集（8 条 query）
 └── examples/           # 15 个示例（完整流水线 / 修订恢复 / 文献综述 …）
 ```
 

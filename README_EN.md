@@ -19,7 +19,7 @@ English | [中文](README.md)
 
 - **Lossless conversion**: download prefers the arXiv LaTeX source path (tarball → Pandoc, math preserved as `$...$`/`$$...$$`), falls back to PDF extraction (pymupdf), then to the arXiv HTML converter; DOI / S2 IDs are auto-resolved to arXiv versions.
 - **Hardened**: `download_paper.py` has SSRF protection (scheme whitelist + rejection of targets resolving to local/link-local addresses) and tar-safe extraction (rejects path traversal, symlinks, and non-regular-file members).
-- **Post-fix state**: SKILL.md slimmed to 3.8KB with search usage externalized to `reference/search.md`; ~130 dangling references resolved — 90 repointed to real assets, the remaining 49 (13 files) explicitly marked "⚠️ 依赖缺失，当前版本未实现" (upstream ARS shared contracts and compliance/raise frameworks have no equivalent here), zero unmarked leftovers.
+- **Post-fix state**: SKILL.md slimmed to 4.6KB with search usage externalized to `reference/search.md`; ~140 dangling references resolved — 90 repointed to real assets, the remaining 49 (13 files) explicitly marked "⚠️ 依赖缺失，当前版本未实现" (upstream ARS shared contracts and compliance/raise frameworks have no equivalent here), zero unmarked leftovers.
 - **search → paper/pipeline handoff**: search output (a Markdown full-text list) is the input corpus for paper's literature strategist agent and pipeline Stage 1; the handoff format is in `reference/search.md` § "与其他模块的衔接".
 
 ## 📦 Installation
@@ -35,7 +35,7 @@ cp -r /path/to/liuxiang ~/.zcode/skills/liuxiang
 npx skills add Kirky-X/liuxiang --agent claude-code -y
 ```
 
-Dependencies: Python 3.8+ with `requests httpx beautifulsoup4 lxml pdfminer.six pymupdf` (a `pip install` away; the search APIs are free and keyless); Pandoc is an optional dependency for the lossless LaTeX path.
+Dependencies: Python 3.8+ with `requests defusedxml beautifulsoup4 lxml pdfminer.six pymupdf` (a `pip install` away; the search APIs are free and keyless); `pypandoc-binary` (Pandoc) is an optional dependency for the lossless LaTeX path.
 
 ## 🚀 Quick Start
 
@@ -56,9 +56,9 @@ Note: only open-access papers can be downloaded in full text; when full text is 
 
 ## ✅ Tests & Verification
 
-Verified 2026-09-13 (v0.1.1, matching the git tag):
+Verified 2026-09-13 (at v0.1.1; current version 0.1.3, matching the latest git tag v0.1.3):
 
-- **Syntax**: all 4 Python scripts pass `py_compile`.
+- **Syntax**: all 12 Python scripts pass `py_compile` (re-verified 2026-10-04).
 - **Functional**:
   - `search_papers.py "attention is all you need" --mode title --limit 3` returned 3 real results (Semantic Scholar 429 → automatic fallback to OpenAlex)
   - `pdf2md.py` converted a locally generated PDF end-to-end, producing frontmatter and body text
@@ -70,13 +70,15 @@ Verified 2026-09-13 (v0.1.1, matching the git tag):
 
 ```
 liuxiang/
-├── SKILL.md            # 3.8KB entry: four-module routing + search quick reference
-├── skill.json          # v0.1.1, MIT
-├── scripts/            # search_papers.py / download_paper.py / pdf2md.py / html2md.py
+├── SKILL.md            # 4.6KB entry: four-module routing + search quick reference
+├── skill.json          # v0.1.3, MIT
+├── scripts/            # 12 scripts: search_papers.py / download_paper.py / pdf2md.py / html2md.py / citation_graph.py / passport_tool.py / check_inventory.py / check_latex.py / check_pipeline_integrity.py / mdtables.py / skill_lint.py / test_claim_audit_calibration.py
 ├── reference/          # Per-module flow docs (search / paper / reviewer / pipeline)
-├── references/         # 58 protocols & standards (citation formats / review criteria / pipeline state machine …)
+├── references/         # 61 protocols & standards (citation formats / review criteria / pipeline state machine …; index.md is the navigation index)
 ├── agents/             # 24 agent definitions (paper 12 + reviewer 7 + orchestrator, etc.)
 ├── templates/          # 14 output templates (IMRaD / review report / revision tracking …)
+├── tests/              # 9 pytest suites (covering 9 of the scripts) + SKIPPED.md
+├── triggers/           # trigger-queries.json trigger evaluation set (8 queries)
 └── examples/           # 15 examples (full pipeline / revision recovery / literature review …)
 ```
 

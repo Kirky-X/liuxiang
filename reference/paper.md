@@ -386,7 +386,7 @@ See `../agents/intake_agent.md` for the complete field definitions of the Phase 
 
 **Agent definitions**: `../agents/{agent_name}.md` — one file per agent (12 total, matching Agent Team table above).
 
-**References** (21 files in `../references/`):
+**References** (22 listed below; 61 total files in `../references/`):
 
 - Citation: `apa7_extended_guide`, `apa7_chinese_citation_guide`, `citation_format_switcher`
 - Writing: `academic_writing_style`, `writing_quality_check`, `writing_judgment_framework`
@@ -398,9 +398,9 @@ See `../agents/intake_agent.md` for the complete field definitions of the Phase 
 - Revision loop: `craft_criteria_checklist` (30 craft criteria, ARC/PRO/MTH/FIG/CIT/PRC), `issue_lifecycle_protocol` (diagnose→act separation, stable issue IDs)
 - Also: `../references/apa7_extended_guide.md`（基础引用规范，本模块在其上扩展）
 
-**Templates** (14 files in `../templates/`): `imrad`, `literature_review`, `case_study`, `theoretical_paper`, `policy_brief`, `conference_paper`, `bilingual_abstract`, `credit_statement`, `funding_statement`, `revision_tracking`（4 状态类型）, `peer_review_report`, `editorial_decision`, `revision_response`, `pipeline_status`。LaTeX 模板参考见 `../references/latex_template_reference.md`（上游独立 `latex_article_template.tex` ⚠️ 依赖缺失，未随本套件发布）。
+**Templates** (14 files in `../templates/`): `imrad`, `literature_review`, `case_study`, `theoretical_paper`, `policy_brief`, `conference_paper`, `bilingual_abstract`, `credit_statement`, `funding_statement`, `revision_tracking`（7 状态类型）, `peer_review_report`, `editorial_decision`, `revision_response`, `pipeline_status`。LaTeX 模板参考见 `../references/latex_template_reference.md`（上游独立 `latex_article_template.tex` ⚠️ 依赖缺失，未随本套件发布）。
 
-**Examples** (9 files in `../examples/`): `imrad_hei_example`, `literature_review_example`, `plan_mode_guided_writing`, `chinese_paper_example`, `revision_mode_example`, `revision_recovery_example`, `clinical_citation_verification_checklist`, `clinical_epistemic_status_example`, `version_family_reconciliation_example`.
+**Examples** (15 files in `../examples/`): `imrad_hei_example`, `literature_review_example`, `plan_mode_guided_writing`, `chinese_paper_example`, `revision_mode_example`, `revision_recovery_example`, `clinical_citation_verification_checklist`, `clinical_epistemic_status_example`, `version_family_reconciliation_example`, `commitment_ledger_example`, `full_pipeline_example`, `hei_paper_review_example`, `integrity_failure_recovery`, `interdisciplinary_review_example`, `mid_entry_example`.
 
 ---
 
@@ -480,7 +480,7 @@ paper + pipeline -> 端到端编排（10 阶段含诚信审查与两阶段评审
 
 | Item             | Content                                                                    |
 | ---------------- | -------------------------------------------------------------------------- |
-| Skill Version    | 3.11.0（套件统一版本；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注）       |
+| Skill Version    | 0.1.3（套件统一版本，与 skill.json / git tag v0.1.3 一致；正文 `v3.2`–`v3.9.2` 等为上游 ARS 机制历史标注）       |
 | Last Updated     | 2026-10-01 |
 | Maintainer       | Cheng-I Wu                                                                 |
 | Dependent Modules | 本套件 search 模块（upstream 语料）、reviewer 模块（downstream 评审）       |

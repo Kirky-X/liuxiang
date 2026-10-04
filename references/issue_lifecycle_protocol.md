@@ -29,7 +29,7 @@ reviewer panel, Phase 1                           paper revision / draft writer
 
 ### Stage D obligations
 
-1. **Read-only.** The manuscript is not edited, annotated, or rewritten. `reference/reviewer.md` Checkpoint Rule #6 already binds the panel; this protocol adds the converse obligation below.
+1. **Read-only.** The manuscript is not edited, annotated, or rewritten. `../reference/reviewer.md` Checkpoint Rule #6 already binds the panel; this protocol adds the converse obligation below.
 2. **Quote the pre-revision text.** Every issue quotes the passage it objects to *as it currently stands*. A reviewer who cannot quote it cannot report it.
 3. **One issue per defect.** A defect is the smallest unit an author could act on independently. Do not bundle three unrelated defects into one issue for economy — they will be tracked as one and resolved as zero.
 4. **Suggest, do not supply.** An issue may state the direction of a fix. It must not carry replacement text presented as the fix; the writing voice belongs to Stage A.

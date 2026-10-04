@@ -1,7 +1,7 @@
 # Retrieval-Augmented Review Protocol（检索增强评审）
 
 **Status**: v0.1（2026-10-01 新增，借鉴 zhu-minjun/Researcher 的 DeepReviewer Best Mode 两步法）
-**Parent**: `reference/reviewer.md`
+**Parent**: `../reference/reviewer.md`
 **依赖**: search 模块的 `scripts/search_papers.py`（已随套件发布，无需新代码）
 
 ---
