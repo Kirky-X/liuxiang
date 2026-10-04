@@ -1,0 +1,10 @@
+{
+  "external_paths": [
+    "shared/",
+    "docs/",
+    "academic-pipeline/",
+    "academic-paper/",
+    "academic-paper-reviewer/",
+    "deep-research/"
+  ]
+}
