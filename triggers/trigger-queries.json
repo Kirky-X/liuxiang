@@ -5,6 +5,7 @@
     {"q": "帮我把这篇 arXiv 论文的 PDF 下载下来", "expect": "trigger"},
     {"q": "这个 DOI 对应的论文帮我找到并下载", "expect": "trigger"},
     {"q": "我要写一篇 RAG 综述论文，帮我在 arXiv 上搜下相关工作", "expect": "trigger"},
+    {"q": "搜几篇对比学习方向的最新论文下载下来", "expect": "trigger", "mirror": "cangjie"},
     {"q": "帮我 review 这个 PR 的代码质量", "expect": "no", "owner": "diting"},
     {"q": "审查一下这个模块的架构分层和命名风格", "expect": "no", "owner": "diting"},
     {"q": "帮我总结这篇论文讲了什么", "expect": "no", "owner": "cangjie"},
