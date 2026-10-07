@@ -9,6 +9,7 @@
     {"q": "帮我 review 这个 PR 的代码质量", "expect": "no", "owner": "diting"},
     {"q": "审查一下这个模块的架构分层和命名风格", "expect": "no", "owner": "diting"},
     {"q": "帮我总结这篇论文讲了什么", "expect": "no", "owner": "cangjie"},
-    {"q": "把这篇英文论文的摘要翻译成中文", "expect": "no", "owner": "cangjie"}
+    {"q": "把这篇英文论文的摘要翻译成中文", "expect": "no", "owner": "cangjie"},
+    {"q": "帮我把这 20 篇文献整理成结构化的学习笔记", "expect": "no", "owner": "cangjie"}
   ]
 }
