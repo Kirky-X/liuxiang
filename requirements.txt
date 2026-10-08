@@ -1,0 +1,5 @@
+# liuxiang（留香）脚本与测试运行依赖；Python >= 3.11
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+defusedxml>=0.7.1
+pymupdf>=1.24.0

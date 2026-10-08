@@ -602,7 +602,8 @@ def _dedup_key(p: dict) -> str | None:
     if p.get("doi"):
         return f"doi:{p['doi'].strip().lower()}"
     if p.get("arxiv_id"):
-        return f"arxiv:{re.sub(r'v\d+$', '', p['arxiv_id'].strip().lower())}"
+        arxiv = re.sub(r"v\d+$", "", p["arxiv_id"].strip().lower())
+        return f"arxiv:{arxiv}"
     if p.get("pmid"):
         return f"pmid:{p['pmid'].strip()}"
     # 标题兜底：小写 + 去标点/空格，避免因大小写/空格差异误判为不同论文
