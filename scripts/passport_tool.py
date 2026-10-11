@@ -30,7 +30,7 @@ import hashlib
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 PLACEHOLDER_HASH = "000000000000"
 LEDGER_KEY = "reset_boundary"
@@ -181,7 +181,7 @@ def emit_boundary(path: str, stage, next_stage, session_marker: str | None = Non
         "next": next_stage,
         "version_label": version_label or f"checkpoint_v{len(prior) + 1}",
         "session_marker": session_marker,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     if pending_decision is not None:
         entry["pending_decision"] = pending_decision
@@ -203,7 +203,7 @@ def record_resume(path: str, target_hash: str, session_marker: str | None = None
         "kind": RESUME_KIND,
         "consumes_hash": target_hash,
         "session_marker": session_marker,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     passport.setdefault(LEDGER_KEY, []).append(entry)
     save_passport(path, passport)
